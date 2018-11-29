@@ -1,0 +1,160 @@
+<!Doctype html>
+<html>
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+
+<body>
+    <!--UPPER PART-->
+    <form id="formMessage">
+        <!--MESSAGE READING-->
+        <div class="inline-div">
+            <fieldset style="padding: 20pt">
+                <legend>Public conversation</legend>
+                <div class="inline-div">
+                    <textarea cols="60" rows="12" id="textReceivedPublicMessages" class="inline-txtarea" disabled></textarea>
+                </div>
+            </fieldset>
+        </div>
+
+        <!--ID AND MESSAGE WRITING-->
+        <div class="inline-div">
+            <p align="center">Your ID</p>
+            <textarea style="vertical-align: middle; text-align: center; font-weight: bold"
+                      cols="60" rows="3" id="textID" class="inline-txtarea-dark" disabled></textarea>
+            <p align="center">Write your own messages</p>
+            <textarea cols="60" rows="9" id="textContent" class="inline-txtarea-active" placeholder="Write your messages here"></textarea>
+        </div>
+
+        <!--PRIVATE CONVERSATIONS-->
+        <div class="inline-div">
+            <fieldset style="padding: 20pt">
+                <legend>Your private conversations</legend>
+                <form id="formPrivate">
+                    <div class="inline-div">
+                        <textarea cols="60" rows="9" id="textReceivedPrivateMessages" class="inline-txtarea" disabled></textarea>
+                    </div><br>
+                    <p><label for="peersNameOption">Peer:</label>
+                        <select id="selectPrivate1" onchange="choosePeer(1)" name="peersNameOption">
+                            <option selected="selected" id="default1" disabled hidden>Choose a conversation</option>
+                        </select></p>
+                </form>
+            </fieldset>
+        </div>
+    </form>
+
+    <!--LOWER PART-->
+    <!--FILE INDEXING-->
+    <div class="inline-div" style="vertical-align: top">
+        <fieldset>
+            <legend>File sharing</legend>
+            <label style="display: inline-block">Shared files</label>
+            <label for="inputFileUpload" class="labelButton">Share file...</label>
+            <input type="file" name="photo" id="inputFileUpload" onchange="fileIndexing(event)"/>
+            <table id="tableFiles" class="large" style="font-size: 10px;">
+                <colgroup>
+                    <col width="370px">
+                    <col width="150px">
+                </colgroup>
+                <tr>
+                    <th>Metahash</th>
+                    <th>File name</th>
+                </tr>
+            </table>
+        </fieldset>
+    </div>
+
+    <!--SENDING OPTIONS-->
+    <div class="inline-div" style="vertical-align: top">
+        <fieldset>
+            <legend>Sending options</legend>
+            <form id="formSending">
+                <button class="button" id="buttonSendMessage" style="vertical-align: top">Send</button>
+                <div class="inline-div">
+                    <label class="container">Public
+                        <input type="radio" id="radioPublic" checked="checked" name="radio">
+                        <span class="checkmark"></span>
+                    </label>
+                    <label class="container">Private
+                        <input type="radio" id="radioPrivate" name="radio">
+                        <span class="checkmark"></span>
+                    </label>
+                    <label class="container">File request
+                        <input type="radio" id="radioFileRequest" name="radio">
+                        <span class="checkmark"></span>
+                    </label>
+                </div><br>
+                <label for="peersNameOption">Peer:</label>
+                <select id="selectPrivate2" name="peersNameOption" onchange="choosePeer(2)" style="margin: 10px;">
+                    <option selected="selected" id="default2" disabled hidden>Choose a peer to interact with</option>
+                </select><br>
+                <label for="hash" class="fixedlength">File name:</label><br>
+                <input id="inputFileName" maxlength="64" size="38"><br>
+                <label for="hash" class="fixedlength">Hash request:</label><br>
+                <input id="inputHashRequest" maxlength="64" size="38">
+            </form>
+        </fieldset>
+    </div>
+
+    <div class="inline-div">
+        <fieldset>
+            <legend>Peers and addresses</legend>
+            <!--ADDING NEW PEERS-->
+            <div style="vertical-align: top; display: flex">
+                    <form id="formAddPeer">
+                        <div style="display: flex">
+                            <div>
+                                <label for="address" class="fixedlength">IP address:</label>
+                                <input id="inputAddress" type="text" name="address" maxlength="15"><br>
+                                <label for="port"class="fixedlength">Port:</label>
+                                <input id="inputPort" type="text" name="port" maxlength="5">
+                            </div>
+                            <div>
+                                <button id="buttonAddAddress" class="button" style="margin: 5px;">Add</button>
+                            </div>
+                        </div>
+                    </form>
+            </div>
+            <!--ADDRESSES AND PEERS KNOWN-->
+            <div class="inline-div">
+                <div style="display: flex">
+                    <div>
+                        <p align="center">Addresses known</p>
+                        <table id="tableAddresses" class="small">
+                            <colgroup>
+                                <col width="150">
+                                <col width="55">
+                            </colgroup>
+
+                            <tr>
+                                <th>IP address</th>
+                                <th>Port</th>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div>
+                        <p align="center">Peers known</p>
+                        <table id="tableNames" class="small">
+                            <col width="205">
+                            <tr>
+                                <th>Name</th>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </fieldset>
+    </div>
+
+    <script src="utilities.js"></script>
+    <script src="fileIndexing.js"></script>
+    <script src="fileRequesting.js"></script>
+    <script src="id.js"></script>
+    <script src="message.js"></script>
+    <script src="name.js"></script>
+    <script src="node.js"></script>
+    <script src="private.js"></script>
+    <script src="script.js"></script>
+</body>

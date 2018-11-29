@@ -2,53 +2,57 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"github.com/Theyiot/Peerster/gossiper"
+	"github.com/Theyiot/Peerster/util"
+	"github.com/dedis/protobuf"
 	"net"
-	"time"
 	"strconv"
 )
 
-type SimpleMessage struct {
-	OriginalName string
-	RelayPeerAddr string
-	Contents string
-}
-
-type GossipPacket struct {
-	Simple *SimpleMessage
-}
-
-func CheckError(err error) {
-	if err  != nil {
-		fmt.Println("Error: " , err)
-	}
-}
-
 func main() {
 	uiPort := flag.Int("UIPort", 8080, "Port for the UI client")
+	dest := flag.String("dest", "", "Node to send the private message")
+	file := flag.String("file", "", "Node to send the private message")
+	request := flag.String("request", "", "The hash of the file to download")
 	msg := flag.String("msg", "default message", "message to be sent")
 
 	flag.Parse()
 
-	ServerAddr,err := net.ResolveUDPAddr("udp", *gossipAddr)
-	CheckError(err)
-
-	LocalAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	CheckError(err)
-
-	Conn, err := net.DialUDP("udp", LocalAddr, ServerAddr)
-	CheckError(err)
-
-	defer Conn.Close()
-	i := 0
-	for {
-		msg := strconv.Itoa(i)
-		i++
-		buf := []byte(msg)
-		_,err := Conn.Write(buf)
-		if err != nil {
-			fmt.Println(msg, err)
-		}
-		time.Sleep(time.Second * 1)
+	if *msg == "" && *file == "" {
+		println("You must either send a message or choose a file (to download or to load)")
+		return
 	}
+	serverAddr,err := net.ResolveUDPAddr("udp4", "127.0.0.1:" + strconv.Itoa(*uiPort))
+	util.FailOnError(err)
+
+	conn, err := net.DialUDP("udp4", nil, serverAddr)
+	defer conn.Close()
+
+	var clientGossipPacket gossiper.ClientGossipPacket
+	if *file != "" { //FILE MESSAGE
+		if *request == "" {
+			if *dest != "" {
+				println("cannot request a chunk from peer " + *dest + " if you don't provide the chunk's hash")
+			}
+			clientGossipPacket = gossiper.ClientGossipPacket{File: &gossiper.FileMessage{FileName: *file}}
+		} else {
+			if !gossiper.IsHexHash(*request) {
+				println("request is not a hash, should be a 64 hexadecimal " + "characters string, " +
+					"but was " + *request)
+			}
+			fileRequest := gossiper.FileMessage{FileName: *file, Destination: *dest, Request: *request}
+			clientGossipPacket = gossiper.ClientGossipPacket{File: &fileRequest}
+		}
+	} else if *dest != "" { //PRIVATE MESSAGE
+		privateMessage := gossiper.PrivateMessage{Text: *msg, Destination: *dest}
+		clientGossipPacket = gossiper.ClientGossipPacket{Private: &privateMessage}
+	} else { //SIMPLE MESSAGE
+		simpleMessage := gossiper.SimpleMessage{Contents: *msg}
+		clientGossipPacket = gossiper.ClientGossipPacket{Simple: &simpleMessage}
+	}
+
+	bytesToSend, err := protobuf.Encode(&clientGossipPacket)
+	util.FailOnError(err)
+
+	conn.Write(bytesToSend)
 }
