@@ -44,7 +44,7 @@ func (gossiper *Gossiper) handleGossip() {
 			} else if gossipPacket.DataReply != nil { //DATA REPLY PACKET
 				gossiper.receiveDataReplyPacket(gossipPacket, addr)
 			} else if gossipPacket.SearchRequest != nil { //DATA REPLY PACKET
-
+				gossiper.receiveSearchRequest(gossipPacket, addr)
 			} else if gossipPacket.SearchReply != nil { //DATA REPLY PACKET
 
 			} else {

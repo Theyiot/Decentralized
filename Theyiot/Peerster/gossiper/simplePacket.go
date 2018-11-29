@@ -13,7 +13,7 @@ func (gossiper *Gossiper) receiveSimplePacket(gossipPacket GossipPacket) {
 	gossipPacket.Simple.RelayPeerAddr = gossiper.GossipAddr
 
 	// TRANSMITTING PACKET TO ALL KNOWN PEERS EXCEPT RELAY PEER
-	for _, address := range gossiper.Peers.Addresses {
+	for _, address := range gossiper.Peers.GetAddresses() {
 		if strings.EqualFold(address.String(), relayAddr) {
 			continue
 		}
@@ -30,7 +30,7 @@ func (gossiper *Gossiper) sendSimplePacket(content string) {
 	simplePacket.Simple.OriginalName = gossiper.Name
 	simplePacket.Simple.RelayPeerAddr = gossiper.GossipAddr
 
-	for _, address := range gossiper.Peers.Addresses {
+	for _, address := range gossiper.Peers.GetAddresses() {
 		gossiper.ToSend <- PacketToSend{Address: address, GossipPacket: &simplePacket}
 	}
 }

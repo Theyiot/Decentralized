@@ -54,8 +54,8 @@ func (gossiper *Gossiper) indexFile(fileName string) {
 	return
 }
 
-func (gossiper *Gossiper) requestFile(fileName string, dest string, hashHex string) {
-	addrNotCasted, exist := gossiper.DSDV.Load(dest)
+func (gossiper *Gossiper) requestFile(fileName string, destination string, hashHex string) {
+	addrNotCasted, exist := gossiper.DSDV.Load(destination)
 	if !exist {
 		println("ERROR : trying to request a file from an unknown peer")
 		return
@@ -66,10 +66,10 @@ func (gossiper *Gossiper) requestFile(fileName string, dest string, hashHex stri
 	defer close(fileChannel)
 	gossiper.ReceivingFile.Store(addr.String(), fileChannel)
 
-	str := "DOWNLOADING metafile of " + fileName + " from " + dest
+	str := "DOWNLOADING metafile of " + fileName + " from " + destination
 	gossiper.ToPrint <- str
 
-	metaFile, err := gossiper.sendDataRequest(stringToHash(hashHex), dest, addr, fileChannel)
+	metaFile, err := gossiper.sendDataRequest(stringToHash(hashHex), destination, addr, fileChannel)
 	if util.CheckAndPrintError(err) {
 		gossiper.ReceivingFile.Delete(addr.String())
 		return
@@ -103,10 +103,10 @@ func (gossiper *Gossiper) requestFile(fileName string, dest string, hashHex stri
 	defer file.Close()
 
 	for i, request := range hashesCopy {
-		str := "DOWNLOADING " + fileName + " chunk " + strconv.Itoa(i + 1) + " from " + dest
+		str := "DOWNLOADING " + fileName + " chunk " + strconv.Itoa(i + 1) + " from " + destination
 		gossiper.ToPrint <- str
 
-		chunk, err := gossiper.sendDataRequest(request, dest, addr, fileChannel)
+		chunk, err := gossiper.sendDataRequest(request, destination, addr, fileChannel)
 		if util.CheckAndPrintError(err) || !checkAndPrintSameHash(hex.EncodeToString(request), chunk) {
 			gossiper.ReceivingFile.Delete(addr.String())
 			os.Remove(SHARED_FILES_PATH + fileName)

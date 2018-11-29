@@ -29,7 +29,7 @@ func (gossiper *Gossiper) antiEntropy() {
 
 		select {
 		case <- ticker.C:
-			if gossiper.Peers.Size > 0 {
+			if gossiper.Peers.GetSize() > 0 {
 				randomPeer := gossiper.Peers.ChooseRandomPeer()
 				gossiper.ToSend <- PacketToSend{ Address: randomPeer, GossipPacket: &GossipPacket{ Status: gossiper.constructStatuses() }}
 				ticker.Stop()

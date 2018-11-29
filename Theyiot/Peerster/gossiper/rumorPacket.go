@@ -18,7 +18,7 @@ func (gossiper *Gossiper) sendRumorPacket(content string) {
 	gossiper.VectorClock.Store(gossiper.Name, id.(uint32)+uint32(1))
 
 
-	for _, address := range gossiper.Peers.Addresses {
+	for _, address := range gossiper.Peers.GetAddresses() {
 		gossiper.ToSend <- PacketToSend{Address: address, GossipPacket: &rumorPacket}
 	}
 }

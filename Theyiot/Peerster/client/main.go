@@ -15,6 +15,8 @@ func main() {
 	file := flag.String("file", "", "Node to send the private message")
 	request := flag.String("request", "", "The hash of the file to download")
 	msg := flag.String("msg", "default message", "message to be sent")
+	keywords := flag.String("keywords", "", "keywords to search")
+	budget := flag.Int("budget", 2, "budget of search request")
 
 	flag.Parse()
 
