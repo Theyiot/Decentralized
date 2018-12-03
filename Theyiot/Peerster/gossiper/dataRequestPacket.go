@@ -20,11 +20,11 @@ func (gossiper *Gossiper) receiveDataRequestPacket(gossipPacket GossipPacket, ad
 
 	//FILE REQUEST IS NOT DESTINED TO US
 	if dest != gossiper.Name {
-		gossiper.forwardDataRequestPacket(gossipPacket, dest, addr.String())
+		gossiper.forwardDataRequestPacket(gossipPacket, addr.String())
 	}
 
 	//REQUESTED HASH CORRESPONDS TO A METAFILE
-	if _, err := os.Stat(FILE_CHUNKS_PATH + hashHex); os.IsNotExist(err) {
+	if _, err := os.Stat(PATH_FILE_CHUNKS + hashHex); os.IsNotExist(err) {
 		println("ERROR : cannot find file for hash : " + hashHex)
 		return
 	}
@@ -37,16 +37,16 @@ func (gossiper *Gossiper) receiveDataRequestPacket(gossipPacket GossipPacket, ad
 	gossiper.ToSend <- PacketToSend{GossipPacket: &GossipPacket{DataReply: &dataReply}, Address: addr}
 }
 
-func (gossiper *Gossiper) forwardDataRequestPacket(gossipPacket GossipPacket, dest string, senderAddr string) {
+func (gossiper *Gossiper) forwardDataRequestPacket(gossipPacket GossipPacket, senderAddr string) {
 	//WE DECREASE AND DISCARD INVALID PACKET
 	gossipPacket.DataRequest.HopLimit--
 	if gossipPacket.DataRequest.HopLimit == 0 {
 		return
 	}
 
-	nextHopAddr, exist := gossiper.DSDV.Load(dest)
+	nextHopAddr, exist := gossiper.DSDV.Load(gossipPacket.DataRequest.Destination)
 	if !exist {
-		println("ERROR : don't know how to forward to " + dest + " but was in DSDV for address " + senderAddr)
+		println("ERROR : don't know how to forward to " + gossipPacket.DataRequest.Destination)
 		return
 	}
 

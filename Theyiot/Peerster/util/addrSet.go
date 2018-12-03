@@ -9,7 +9,6 @@ import (
 
 type AddrSet struct {
 	addresses []*net.UDPAddr
-	size      int
 	lock      sync.RWMutex
 }
 
@@ -22,7 +21,6 @@ func (set *AddrSet) Add(address string) {
 
 		set.lock.Lock()
 		set.addresses = append(set.addresses, peerAddr)
-		set.size++
 		set.lock.Unlock()
 	}
 }
@@ -52,22 +50,22 @@ func (set *AddrSet) String() string {
 func (set *AddrSet) GetSize() int {
 	set.lock.RLock()
 	defer set.lock.RUnlock()
-	return set.size
+	return len(set.addresses)
 }
 
 func (set *AddrSet) IsEmpty() bool {
 	set.lock.RLock()
 	defer set.lock.RUnlock()
-	return set.size <= 0
+	return len(set.addresses) <= 0
 }
 
 func (set *AddrSet) ChooseRandomPeerExcept(except string) *net.UDPAddr {
 	var address *net.UDPAddr
 	set.lock.RLock()
 	defer set.lock.RUnlock()
-	for address = set.addresses[rand.Intn(set.size)] ;
+	for address = set.addresses[rand.Intn(len(set.addresses))] ;
 		strings.EqualFold(address.String(), except) ;
-		address = set.addresses[rand.Intn(set.size)] {}
+		address = set.addresses[rand.Intn(len(set.addresses))] {}
 
 	return address
 }
@@ -97,7 +95,7 @@ func (set *AddrSet) GetAddresses() []*net.UDPAddr {
 func (set *AddrSet) ChooseRandomPeer() *net.UDPAddr {
 	set.lock.RLock()
 	defer set.lock.RUnlock()
-	return set.addresses[rand.Intn(set.size)]
+	return set.addresses[rand.Intn(len(set.addresses))]
 }
 
 func (set *AddrSet) GetAddressesAsStringArray() []string {
@@ -110,15 +108,15 @@ func (set *AddrSet) GetAddressesAsStringArray() []string {
 	return addresses
 }
 
-func CreateSet(str string) AddrSet {
-	peers := AddrSet{ addresses: nil, size: 0 }
+func CreateAddrSet(str string) *AddrSet {
+	peers := AddrSet{ addresses: make([]*net.UDPAddr, 0) }
 	if strings.EqualFold(str, "") {
-		return peers
+		return &peers
 	} else {
 		split := strings.Split(str, ",")
 		for _, peer := range split {
 			peers.Add(peer)
 		}
 	}
-	return peers
+	return &peers
 }

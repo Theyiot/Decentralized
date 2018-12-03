@@ -5,13 +5,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/Theyiot/Peerster/util"
+	"math/rand"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 )
 
 func (gossiper *Gossiper) indexFile(fileName string) {
-	file, err := os.Open(SHARED_FILES_PATH + fileName)
+	file, err := os.Open(PATH_SHARED_FILES + fileName)
 	defer file.Close()
 	if util.CheckAndPrintError(err) {
 		return
@@ -46,43 +48,137 @@ func (gossiper *Gossiper) indexFile(fileName string) {
 	indexedFile := IndexedFile{FileName: fileName, FileSize: fileStat.Size(), MetaFile: metaFile}
 	gossiper.IndexedFiles.Store(metaHashHex, indexedFile)
 
-	err = writeFile(metaHashHex, metaFile)
-	if util.CheckAndPrintError(err) {
-		return
-	}
-
+	util.CheckAndPrintError(writeFile(metaHashHex, metaFile))
 	return
 }
 
-func (gossiper *Gossiper) requestFile(fileName string, destination string, hashHex string) {
+/*
+This method allows the user to download and store, with a given file name, a file corresponding to the provided metahash
+ */
+func (gossiper *Gossiper) requestFile(fileName string, hashHex string) {
+	searchedFile, found := gossiper.SearchedFiles.Load(hashHex)
+	if !found {
+		println("Requesting an unknown file from multiple peers for : " + hashHex)
+		return
+	}
+	searchedFileChunks := searchedFile.([]SearchedFileChunk)
+	if len(searchedFileChunks) < 1 || searchedFileChunks[0].ChunkCount != uint64(len(searchedFileChunks)) {
+		println("Trying to request for which we don't know where to find all the chunks")
+		return
+	}
+	sort.Slice(searchedFileChunks, func(i, j int) bool {
+		return searchedFileChunks[i].ChunkID < searchedFileChunks[j].ChunkID
+	})
+
+	destination := searchedFileChunks[0].owningPeers[0]
+	metaFile, success := gossiper.requestMetaFile(fileName, destination, hashHex)
+	if !success || !checkAndPrintSameHash(hashHex, metaFile){
+		return
+	}
+
+	hashesCopy := gossiper.GetHashesCopy(metaFile)
+	indexedFile := IndexedFile{MetaFile: metaFile, FileName: fileName}
+
+	file, err := os.Create(PATH_DOWNOADS + fileName)
+	if util.CheckAndPrintError(err) {
+		return
+	}
+	defer file.Close()
+
+	fileSize := 0
+	for i, request := range hashesCopy {
+		destination = searchedFileChunks[i].owningPeers[rand.Intn(len(searchedFileChunks[i].owningPeers))]
+		n := gossiper.requestFileChunk(fileName, destination, request, i, file)
+		fileSize += n
+	}
+	gossiper.ToPrint <- "RECONSTRUCTED file " + fileName
+
+	indexedFile.FileSize = int64(fileSize)
+	gossiper.IndexedFiles.Store(hashHex, indexedFile)
+}
+
+func (gossiper *Gossiper) requestFileFrom(fileName string, destination string, hashHex string) {
+	metaFile, success := gossiper.requestMetaFile(fileName, destination, hashHex)
+	if !success {
+		return
+	}
+
+	var indexedFile IndexedFile
+	hashesCopy := gossiper.GetHashesCopy(metaFile)
+
+	file, err := os.Create(PATH_DOWNOADS + fileName)
+	if util.CheckAndPrintError(err) {
+		return
+	}
+	defer file.Close()
+
+	fileSize := 0
+	for i, request := range hashesCopy {
+		n := gossiper.requestFileChunk(fileName, destination, request, i, file)
+		fileSize += n
+	}
+	gossiper.ToPrint <- "RECONSTRUCTED file " + fileName
+
+	indexedFile.FileSize = int64(fileSize)
+	gossiper.IndexedFiles.Store(hashHex, indexedFile)
+}
+
+func (gossiper *Gossiper) requestFileChunk(fileName string, destination string, request []byte, i int, file *os.File) int {
+	str := "DOWNLOADING " + fileName + " chunk " + strconv.Itoa(i + 1) + " from " + destination
+	gossiper.ToPrint <- str
+
+	hashHex := hex.EncodeToString(request)
+	fileChannel := make(chan[]byte)
+	addr, exist := gossiper.DSDV.Load(destination)
+	if !exist {
+		return 0
+	}
+
+	gossiper.ReceivingFile.Store(hashHex, fileChannel)
+	defer gossiper.ReceivingFile.Delete(hex.EncodeToString(request))
+
+	chunk, err := gossiper.sendDataRequest(request, destination, addr.(*net.UDPAddr), fileChannel)
+	if util.CheckAndPrintError(err) || !checkAndPrintSameHash(hex.EncodeToString(request), chunk) {
+		return 0
+	}
+	n, err := file.Write(chunk)
+	if n != len(chunk) {
+		println("ERROR : The method write did not write the entire buffer")
+		return 0
+	}
+	if util.CheckAndPrintError(err) {
+		os.Remove(PATH_SHARED_FILES + fileName)
+		return 0
+	}
+	return n
+}
+
+func (gossiper *Gossiper) requestMetaFile(fileName, destination, hashHex string) ([]byte, bool) {
 	addrNotCasted, exist := gossiper.DSDV.Load(destination)
 	if !exist {
-		println("ERROR : trying to request a file from an unknown peer")
-		return
+		println("trying to request metafile from an unknown peer for peer name : " + destination)
+		return nil, false
 	}
 	addr := addrNotCasted.(*net.UDPAddr)
 
 	fileChannel := make(chan[]byte)
 	defer close(fileChannel)
-	gossiper.ReceivingFile.Store(addr.String(), fileChannel)
+	gossiper.ReceivingFile.Store(hashHex, fileChannel)
+	defer gossiper.ReceivingFile.Delete(hashHex)
 
 	str := "DOWNLOADING metafile of " + fileName + " from " + destination
 	gossiper.ToPrint <- str
 
 	metaFile, err := gossiper.sendDataRequest(stringToHash(hashHex), destination, addr, fileChannel)
-	if util.CheckAndPrintError(err) {
-		gossiper.ReceivingFile.Delete(addr.String())
-		return
+	if util.CheckAndPrintError(err) || !checkAndPrintSameHash(hashHex, metaFile) {
+		return nil, false
 	}
-	if !checkAndPrintSameHash(hashHex, metaFile) {
-		gossiper.ReceivingFile.Delete(addr.String())
-		return
-	}
+	return metaFile, true
+}
 
-	var indexedFile IndexedFile
+func (gossiper *Gossiper) GetHashesCopy(metaFile []byte) [][]byte {
 	hashes := make([][]byte, 0)
 
-	indexedFile = IndexedFile{MetaFile: metaFile, FileName: fileName}
 	for i := 0 ; i < len(metaFile) / sha256.Size ; i++ {
 		index := i * sha256.Size
 		hashes = append(hashes, metaFile[index:index + sha256.Size])
@@ -95,46 +191,11 @@ func (gossiper *Gossiper) requestFile(fileName string, destination string, hashH
 		hashesCopy = append(hashesCopy, tmpArray)
 	}
 
-	fileSize := 0
-	file, err := os.Create(DOWNLOAD_PATH + fileName)
-	if util.CheckAndPrintError(err) {
-		return
-	}
-	defer file.Close()
-
-	for i, request := range hashesCopy {
-		str := "DOWNLOADING " + fileName + " chunk " + strconv.Itoa(i + 1) + " from " + destination
-		gossiper.ToPrint <- str
-
-		chunk, err := gossiper.sendDataRequest(request, destination, addr, fileChannel)
-		if util.CheckAndPrintError(err) || !checkAndPrintSameHash(hex.EncodeToString(request), chunk) {
-			gossiper.ReceivingFile.Delete(addr.String())
-			os.Remove(SHARED_FILES_PATH + fileName)
-			return
-		}
-		n, err := file.Write(chunk)
-		if n != len(chunk) {
-			println("ERROR : The method write did not write the entire buffer")
-			gossiper.ReceivingFile.Delete(addr.String())
-			os.Remove(SHARED_FILES_PATH + fileName)
-			return
-		}
-		if util.CheckAndPrintError(err) {
-			gossiper.ReceivingFile.Delete(addr.String())
-			os.Remove(SHARED_FILES_PATH + fileName)
-			return
-		}
-		fileSize += n
-	}
-	str = "RECONSTRUCTED file " + fileName
-	gossiper.ToPrint <- str
-
-	indexedFile.FileSize = int64(fileSize)
-	gossiper.IndexedFiles.Store(hashHex, indexedFile)
+	return hashesCopy
 }
 
 func writeFile(fileName string, data []byte) error {
-	fileTmp, err := os.Create(FILE_CHUNKS_PATH + fileName)
+	fileTmp, err := os.Create(PATH_FILE_CHUNKS + fileName)
 	if err != nil {
 		return err
 	}
@@ -156,10 +217,10 @@ func writeFile(fileName string, data []byte) error {
 func readFile(hash string) ([]byte, error) {
 	var stat os.FileInfo
 	var err error
-	if stat, err = os.Stat(FILE_CHUNKS_PATH + hash); os.IsNotExist(err) {
+	if stat, err = os.Stat(PATH_FILE_CHUNKS + hash); os.IsNotExist(err) {
 		return []byte{}, err
 	}
-	fileTmp, err := os.Open(FILE_CHUNKS_PATH + hash)
+	fileTmp, err := os.Open(PATH_FILE_CHUNKS + hash)
 	if err != nil {
 		return []byte{}, err
 	}

@@ -7,11 +7,15 @@ import (
 	"strings"
 )
 
-const DEFAULT_HOP_LIMIT = 10
+const DEFAULT_HOP_LIMIT = 32
+const DEFAULT_BUDGET = 2
+const DEFAULT_MAX_BUDGET = 32
+const DEFAULT_FULL_MATCHES = 2
+const DEFAULT_PORT = 8080
 const CHUNK_SIZE = 8192
-const DOWNLOAD_PATH = "_Downloads/"
-const SHARED_FILES_PATH = "_SharedFiles/"
-const FILE_CHUNKS_PATH = "._FileChunks/"
+const PATH_DOWNOADS = "_Downloads/"
+const PATH_SHARED_FILES = "_SharedFiles/"
+const PATH_FILE_CHUNKS = "._FileChunks/"
 
 func (gossiper *Gossiper) GetRumorsAsList() []RumorMessageTimed {
 	rumors := make([]RumorMessageTimed, 0)

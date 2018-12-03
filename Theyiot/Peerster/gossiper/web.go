@@ -140,7 +140,7 @@ func requestFile(gossiper *Gossiper) http.HandlerFunc {
 			return
 		}
 
-		gossiper.requestFile(fileRequest.FileName, fileRequest.Dest, fileRequest.Request)
+		gossiper.requestFileFrom(fileRequest.FileName, fileRequest.Dest, fileRequest.Request)
 		mapIndexedFiles := gossiper.GetIndexedFilesAsMap()
 		json.NewEncoder(w).Encode(mapIndexedFiles)
 	}

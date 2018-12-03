@@ -1,11 +1,12 @@
 package gossiper
 
 import (
+	"encoding/hex"
 	"net"
 )
 
 func (gossiper *Gossiper) receiveDataReplyPacket(gossipPacket GossipPacket, addr *net.UDPAddr) {
-	fileChannel, exist := gossiper.ReceivingFile.Load(addr.String())
+	fileChannel, exist := gossiper.ReceivingFile.Load(hex.EncodeToString(gossipPacket.DataReply.HashValue))
 	if !exist {
 		return
 	}

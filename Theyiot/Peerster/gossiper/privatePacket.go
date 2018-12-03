@@ -48,16 +48,16 @@ func (gossiper *Gossiper) updatePrivates(gossipPacket GossipPacket, peerName str
 	gossiper.Privates.Store(peerName, messages)
 }
 
-func (gossiper *Gossiper) forwardPrivatePacket(gossipPacket GossipPacket, dest string, senderAddr string) {
+func (gossiper *Gossiper) forwardPrivatePacket(gossipPacket GossipPacket, senderAddr string) {
 	//WE DECREASE AND DISCARD INVALID PACKET
 	gossipPacket.Private.HopLimit--
 	if gossipPacket.Private.HopLimit == 0 {
 		return
 	}
 
-	nextHopAddr, exist := gossiper.DSDV.Load(dest)
+	nextHopAddr, exist := gossiper.DSDV.Load(gossipPacket.Private.Destination)
 	if !exist {
-		println("ERROR : don't know how to forward to " + dest + " but was in DSDV for address " + senderAddr)
+		println("ERROR : don't know how to forward to " + gossipPacket.Private.Destination)
 		return
 	}
 

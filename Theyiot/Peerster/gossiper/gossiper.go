@@ -18,7 +18,7 @@ func StartGossip() {
 	rtimer := flag.Uint("rtimer", 0, "Time between each route rumor")
 	flag.Parse()
 
-	peers := util.CreateSet(strings.Replace(*peersToSplit, " ", "", -1))
+	peers := util.CreateAddrSet(strings.Replace(*peersToSplit, " ", "", -1))
 
 	uiServerAddr, err := net.ResolveUDPAddr("udp4", "127.0.0.1:" + *uiPort)
 	util.FailOnError(err)
@@ -38,14 +38,17 @@ func StartGossip() {
 		GossipServer:  gossipServer,
 		Name:          *name,
 		Simple:        *simple,
-		Peers:         &peers,
+		Peers:         peers,
 		VectorClock:   sync.Map{},
 		Rumors:        sync.Map{},
 		DSDV:          sync.Map{},
 		Privates:      sync.Map{},
 		ReceivingFile: sync.Map{},
 		IndexedFiles:  sync.Map{},
+		SearchedFiles: sync.Map{},
+		SearchRequests:sync.Map{},
 		Acks:          sync.Map{},
+		ActiveSearches:	util.CreateStringSet(),
 		ToPrint:       make(chan string),
 		ToSend:        make(chan PacketToSend),
 	}

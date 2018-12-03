@@ -28,10 +28,19 @@ type PrivateMessage struct {
 	HopLimit    uint32
 }
 
-type FileMessage struct {
+type FileIndexMessage struct {
+	FileName	string
+}
+
+type FileRequestMessage struct {
 	FileName    string
 	Destination string
 	Request     string
+}
+
+type SearchRequestMessage struct {
+	Keywords 	[]string
+	Budget		uint64
 }
 
 type PeerStatus struct {
@@ -63,18 +72,21 @@ type SearchRequest struct {
 	Budget		uint64
 	Keywords 	[]string
 }
+
 type SearchReply struct {
 	Origin 			string
 	Destination 	string
 	HopLimit 		uint32
 	Results			[]*SearchResult
 }
+
 type SearchResult struct {
 	FileName		string
 	MetafileHash	[]byte
 	ChunkMap		[]uint64
 	ChunkCount		uint64
 }
+
 type GossipPacket struct {
 	Simple        *SimpleMessage
 	Rumor         *RumorMessage
@@ -87,9 +99,11 @@ type GossipPacket struct {
 }
 
 type ClientGossipPacket struct {
-	Simple			*SimpleMessage
-	Private 		*PrivateMessage
-	File			*FileMessage
+	Simple				*SimpleMessage
+	Private 			*PrivateMessage
+	FileRequest			*FileRequestMessage
+	FileIndex			*FileIndexMessage
+	FileSearchRequest	*SearchRequestMessage
 }
 
 type PacketToSend struct {
@@ -124,30 +138,38 @@ type IndexedFile struct {
 	MetaFile		[]byte
 }
 
+type SearchedFileChunk struct {
+	FileName		string
+	ChunkID			uint64
+	ChunkCount		uint64
+	owningPeers		[]string
+	lock			sync.RWMutex
+}
+
+type ActiveSearches struct {
+	Keywords		*util.FullMatchesSet
+}
+
 //OTHERS
 type Gossiper struct {
-	UIServer		*net.UDPConn
-	GossipAddr		string
-	GossipServer	*net.UDPConn
-	Name			string
-	Simple			bool
-	Peers			*util.AddrSet
-	//Map[origin]id
-	VectorClock		sync.Map
-	//Map[id@origin]GossipPacket	(only rumors)
-	Rumors			sync.Map
-	//Map[origin]GossipPacket		(only privates)
-	Privates		sync.Map
-	//Map[origin]*net.UDPAddr
-	DSDV			sync.Map
-	//Map[metaHash(string)]IndexedFile
-	IndexedFiles	sync.Map
-	//Map[net.UDPAddr]chan []byte
-	ReceivingFile	sync.Map
-	//Map[origin + id + address]channel
-	Acks    sync.Map
-	ToPrint chan string
-	ToSend  chan PacketToSend
+	UIServer       *net.UDPConn
+	GossipAddr     string
+	GossipServer   *net.UDPConn
+	Name           string
+	Simple         bool
+	Peers          *util.AddrSet
+	VectorClock    sync.Map //Map[origin]id
+	Rumors         sync.Map //Map[id@origin]GossipPacket	(only rumors)
+	Privates       sync.Map //Map[origin]GossipPacket		(only privates)
+	DSDV           sync.Map //Map[origin]*net.UDPAddr
+	IndexedFiles   sync.Map //Map[metaHash(string)]IndexedFile
+	ReceivingFile  sync.Map //Map[net.UDPAddr]chan []byte
+	SearchedFiles  sync.Map //Map[metahash]SearchedFileChunk
+	Acks           sync.Map //Map[origin + id + address]channel
+	SearchRequests sync.Map //Map[origin + keyword]SearchRequests
+	ActiveSearches	*util.FullMatchesSet
+	ToPrint        chan string
+	ToSend         chan PacketToSend
 }
 
 type SingleStringJSON struct {
@@ -168,8 +190,4 @@ type FileRequestJSON struct {
 type WebServerID  struct {
 	Name		string
 	Address		string
-}
-
-type PeersList struct {
-	Peers	[]string
 }

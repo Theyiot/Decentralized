@@ -38,12 +38,16 @@ func (gossiper *Gossiper) sendClientMessage(packet ClientGossipPacket) {
 		}
 	} else if packet.Private != nil { //PRIVATE PACKET
 		gossiper.sendPrivatePacket(packet.Private.Text, packet.Private.Destination)
-	} else if packet.File != nil {
-		if packet.File.Destination == "" {
-			gossiper.indexFile(packet.File.FileName)
+	} else if packet.FileIndex != nil {
+		gossiper.indexFile(packet.FileIndex.FileName)
+	} else if packet.FileRequest != nil {
+		if packet.FileRequest.Destination == "" {
+			gossiper.requestFile(packet.FileRequest.FileName, packet.FileRequest.Request)
 		} else {
-			gossiper.requestFile(packet.File.FileName, packet.File.Destination, packet.File.Request)
+			gossiper.requestFileFrom(packet.FileRequest.FileName, packet.FileRequest.Destination, packet.FileRequest.Request)
 		}
+	} else if packet.FileSearchRequest != nil {
+		gossiper.sendSearchRequest(packet.FileSearchRequest.Keywords, packet.FileSearchRequest.Budget)
 	} else {
 		println("ERROR : client did not send any know kind of packets.")
 	}
@@ -53,7 +57,9 @@ func checkExactlyOnePacketTypeClient(gossipPacket ClientGossipPacket) bool {
 	count := 0
 	if gossipPacket.Simple != nil { count++ }
 	if gossipPacket.Private != nil { count++ }
-	if gossipPacket.File != nil { count++ }
+	if gossipPacket.FileIndex != nil { count++ }
+	if gossipPacket.FileRequest != nil { count++ }
+	if gossipPacket.FileSearchRequest != nil { count++ }
 	if count == 0 {
 		println("Found 0 matching type of packet")
 	}
