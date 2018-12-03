@@ -1,13 +1,19 @@
 package gossiper
 
 import (
+	"github.com/Theyiot/Peerster/constants"
 	"github.com/Theyiot/Peerster/util"
 	"github.com/dedis/protobuf"
 )
 
+
+/*
+	handleGossip takes care of the messages received from other peers. The method also process the different
+	packets, depending on their type
+ */
 func (gossiper *Gossiper) handleGossip() {
 	// DataReplyPacket, Data : 8192, Hash : 32, Hop-Limit : 32, Origin : 512, dest : 512
-	biggestPacketSize := CHUNK_SIZE + 1088
+	biggestPacketSize := constants.CHUNK_SIZE + 1088
 	buf := make([]byte, biggestPacketSize)
 
 	for {
@@ -46,7 +52,7 @@ func (gossiper *Gossiper) handleGossip() {
 			} else if gossipPacket.SearchRequest != nil { //DATA REPLY PACKET
 				gossiper.receiveSearchRequest(gossipPacket, addr)
 			} else if gossipPacket.SearchReply != nil { //DATA REPLY PACKET
-
+				gossiper.receiveSearchReply(gossipPacket, addr)
 			} else {
 				println("Received packet type that should not be sent to other peer")
 			}
@@ -54,6 +60,9 @@ func (gossiper *Gossiper) handleGossip() {
 	}
 }
 
+/*
+	checkExactlyOnePacketType makes sure that the received packet has only one type of packet that is non-nil.
+ */
 func checkExactlyOnePacketType(gossipPacket GossipPacket) bool {
 	count := 0
 	if gossipPacket.Simple != nil { count++ }

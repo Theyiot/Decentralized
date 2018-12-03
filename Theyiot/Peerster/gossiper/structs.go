@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-//DEFAULT PACKETS
+// MESSAGES
 type SimpleMessage struct {
 	OriginalName  string
 	RelayPeerAddr string
@@ -43,13 +43,14 @@ type SearchRequestMessage struct {
 	Budget		uint64
 }
 
+// PACKETS
+type StatusPacket struct {
+	Want	[]PeerStatus
+}
+
 type PeerStatus struct {
 	Identifier	string
 	NextID		uint32
-}
-
-type StatusPacket struct {
-	Want	[]PeerStatus
 }
 
 type DataRequest struct {
@@ -87,30 +88,6 @@ type SearchResult struct {
 	ChunkCount		uint64
 }
 
-type GossipPacket struct {
-	Simple        *SimpleMessage
-	Rumor         *RumorMessage
-	Status        *StatusPacket
-	Private       *PrivateMessage
-	DataRequest   *DataRequest
-	DataReply     *DataReply
-	SearchRequest *SearchRequest
-	SearchReply   *SearchReply
-}
-
-type ClientGossipPacket struct {
-	Simple				*SimpleMessage
-	Private 			*PrivateMessage
-	FileRequest			*FileRequestMessage
-	FileIndex			*FileIndexMessage
-	FileSearchRequest	*SearchRequestMessage
-}
-
-type PacketToSend struct {
-	GossipPacket *GossipPacket
-	Address      *net.UDPAddr
-}
-
 //TIMED PACKETS
 type RumorMessageTimed struct {
 	Rumor		RumorMessage
@@ -127,6 +104,28 @@ type GossipPacketTimed struct {
 	Timestamp		time.Time
 }
 
+//CLIENT AND GOSSIP PACKET
+type GossipPacket struct {
+	Simple			*SimpleMessage
+	Rumor			*RumorMessage
+	Status			*StatusPacket
+	Private			*PrivateMessage
+	DataRequest		*DataRequest
+	DataReply		*DataReply
+	SearchRequest	*SearchRequest
+	SearchReply		*SearchReply
+	TxPublish		*TxPublish
+	BlockPublish	*BlockPublish
+}
+
+type ClientPacket struct {
+	Simple            *SimpleMessage
+	Private           *PrivateMessage
+	FileRequest       *FileRequestMessage
+	FileIndex         *FileIndexMessage
+	FileSearchRequest *SearchRequestMessage
+}
+
 //FILES
 type FileToIndex struct {
 	FileName		string
@@ -139,39 +138,58 @@ type IndexedFile struct {
 }
 
 type SearchedFileChunk struct {
-	FileName		string
-	ChunkID			uint64
-	ChunkCount		uint64
-	owningPeers		[]string
-	lock			sync.RWMutex
+	FileName    string
+	ChunkID     uint64
+	ChunkCount  uint64
+	owningPeers []string
+	lock        sync.RWMutex
 }
 
-type ActiveSearches struct {
-	Keywords		*util.FullMatchesSet
+//BLOCKCHAIN
+type TxPublish struct {
+	File		File
+	HopLimit	uint32
+}
+type BlockPublish struct {
+	Block		Block
+	HopLimit	uint32
+}
+type File struct {
+	Name			string
+	Size			int64
+	MetafileHash	[]byte
+}
+
+type Block struct {
+	PrevHash		[32]byte
+	Nonce			[32]byte
+	Transactions	[]TxPublish
 }
 
 //OTHERS
 type Gossiper struct {
-	UIServer       *net.UDPConn
-	GossipAddr     string
-	GossipServer   *net.UDPConn
-	Name           string
-	Simple         bool
-	Peers          *util.AddrSet
-	VectorClock    sync.Map //Map[origin]id
-	Rumors         sync.Map //Map[id@origin]GossipPacket	(only rumors)
-	Privates       sync.Map //Map[origin]GossipPacket		(only privates)
-	DSDV           sync.Map //Map[origin]*net.UDPAddr
-	IndexedFiles   sync.Map //Map[metaHash(string)]IndexedFile
-	ReceivingFile  sync.Map //Map[net.UDPAddr]chan []byte
-	SearchedFiles  sync.Map //Map[metahash]SearchedFileChunk
-	Acks           sync.Map //Map[origin + id + address]channel
-	SearchRequests sync.Map //Map[origin + keyword]SearchRequests
-	ActiveSearches	*util.FullMatchesSet
-	ToPrint        chan string
-	ToSend         chan PacketToSend
+	UIServer       		*net.UDPConn
+	GossipAddr     		string
+	GossipServer   		*net.UDPConn
+	Name           		string
+	Simple         		bool
+	Peers          		*util.AddrSet
+	VectorClock    		sync.Map //Map[origin]id
+	Rumors         		sync.Map //Map[id@origin]GossipPacket	(only rumors)
+	Privates       		sync.Map //Map[origin]GossipPacket		(only privates)
+	DSDV           		sync.Map //Map[origin]*net.UDPAddr
+	IndexedFiles   		sync.Map //Map[metaHash(string)]IndexedFile
+	ReceivingFile  		sync.Map //Map[net.UDPAddr]chan([]byte)
+	SearchedFiles  		sync.Map //Map[metahash]SearchedFileChunk
+	Acks           		sync.Map //Map[origin + id + address]chan(statusPacket)
+	SearchRequests 		sync.Map //Map[origin + keyword]SearchRequests
+	FinishedSearches	sync.Map //Map[keywords]chan(Signal)
+	ActiveSearches		*util.FullMatchesSet
+	ToPrint     		chan string
+	ToSend 		        chan PacketToSend
 }
 
+// WEB STRUCTS
 type SingleStringJSON struct {
 	Text	string
 }
@@ -191,3 +209,11 @@ type WebServerID  struct {
 	Name		string
 	Address		string
 }
+
+// UTILITIES STRUCTS
+type PacketToSend struct {
+	GossipPacket *GossipPacket
+	Address      *net.UDPAddr
+}
+
+type Signal struct {}

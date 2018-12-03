@@ -7,17 +7,10 @@ import (
 	"strings"
 )
 
-const DEFAULT_HOP_LIMIT = 32
-const DEFAULT_BUDGET = 2
-const DEFAULT_MAX_BUDGET = 32
-const DEFAULT_FULL_MATCHES = 2
-const DEFAULT_PORT = 8080
-const CHUNK_SIZE = 8192
-const PATH_DOWNOADS = "_Downloads/"
-const PATH_SHARED_FILES = "_SharedFiles/"
-const PATH_FILE_CHUNKS = "._FileChunks/"
-
-func (gossiper *Gossiper) GetRumorsAsList() []RumorMessageTimed {
+/*
+	getRumorAsList returns a list of all the non-empty rumors we have received so far
+ */
+func (gossiper *Gossiper) getRumorsAsList() []RumorMessageTimed {
 	rumors := make([]RumorMessageTimed, 0)
 	gossiper.Rumors.Range(func(key, rumorPacket interface{}) bool {
 		id, origin, err := splitKey(key.(string))
@@ -38,7 +31,10 @@ func (gossiper *Gossiper) GetRumorsAsList() []RumorMessageTimed {
 	return rumors
 }
 
-func (gossiper *Gossiper) GetPeersNameAsMap() []string {
+/*
+	getPeersNameAsList returns a list of all the known peers name
+ */
+func (gossiper *Gossiper) getPeersNameAsList() []string {
 	names := make([]string, 0)
 	gossiper.DSDV.Range(func(origin, address interface{}) bool {
 		names = append(names, origin.(string))
@@ -48,7 +44,10 @@ func (gossiper *Gossiper) GetPeersNameAsMap() []string {
 	return names
 }
 
-func (gossiper *Gossiper) GetPrivateMessagesAsMap() map[string][]PrivateMessageTimed {
+/*
+	getPrivateMessagesAsMap returns a map of the form origin -> []PrivateMessageTimed for all our known peers
+ */
+func (gossiper *Gossiper) getPrivateMessagesAsMap() map[string][]PrivateMessageTimed {
 	privates := make(map[string][]PrivateMessageTimed, 0)
 	gossiper.DSDV.Range(func(origin, _ interface{}) bool {
 		privates[origin.(string)] = make([]PrivateMessageTimed, 0)
@@ -66,7 +65,10 @@ func (gossiper *Gossiper) GetPrivateMessagesAsMap() map[string][]PrivateMessageT
 	return privates
 }
 
-func (gossiper *Gossiper) GetIndexedFilesAsMap() map[string]string {
+/*
+	getIndexedFilesAsMap returns a map of the form metaHash -> fileName for all our indexed files
+ */
+func (gossiper *Gossiper) getIndexedFilesAsMap() map[string]string {
 	indexedFiles := make(map[string]string, 0)
 	gossiper.IndexedFiles.Range(func(metaHash, file interface{}) bool {
 		indexedFiles[metaHash.(string)] = file.(IndexedFile).FileName
@@ -75,6 +77,10 @@ func (gossiper *Gossiper) GetIndexedFilesAsMap() map[string]string {
 	return indexedFiles
 }
 
+/*
+	splitKey tries to split a key that have the form id@origin. It returns an error if the splitting process
+	fails at some point
+ */
 func splitKey(key string) (uint32, string, error) {
 	idOrigin := strings.SplitN(key, "@", 2)
 	idString, origin := idOrigin[0], idOrigin[1]
@@ -82,6 +88,9 @@ func splitKey(key string) (uint32, string, error) {
 	return uint32(id), origin, err
 }
 
+/*
+	constructStatuses iterate through our vector clock and create a status packet from this information
+ */
 func (gossiper *Gossiper) constructStatuses() *StatusPacket {
 	var statuses []PeerStatus
 	gossiper.VectorClock.Range(func(origin, nextID interface{}) bool {

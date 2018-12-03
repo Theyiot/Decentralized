@@ -3,12 +3,21 @@ package gossiper
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/Theyiot/Peerster/constants"
 	"github.com/Theyiot/Peerster/util"
 	"net"
 	"strings"
 )
 
-func (gossiper *Gossiper) receiveSearchReply(gossipPacket GossipPacket) {
+/*
+	receiveSearchReply handles the packets of search reply type
+ */
+func (gossiper *Gossiper) receiveSearchReply(gossipPacket GossipPacket, addr *net.UDPAddr) {
+	_, exist := gossiper.DSDV.LoadOrStore(gossipPacket.SearchReply.Origin, addr)
+	if !exist {
+		gossiper.ToPrint <- "DSDV " + gossipPacket.SearchReply.Origin + " " + addr.String()
+	}
+
 	if gossipPacket.SearchReply.Destination != gossiper.Name {
 		gossiper.forwardSearchReplyPacket(gossipPacket)
 		return
@@ -18,7 +27,6 @@ func (gossiper *Gossiper) receiveSearchReply(gossipPacket GossipPacket) {
 		peerName, hashHex := gossipPacket.SearchReply.Origin, hex.EncodeToString(result.MetafileHash)
 		str := "FOUND match " + result.FileName + " at " + peerName+ " metafile=" + hashHex + " chunks="
 		for i := 0 ; i < len(result.ChunkMap) ; i++ {
-			//gossiper.SearchedFiles.LoadOrStore()
 			str += fmt.Sprint(result.ChunkMap[i])
 			if i < len(result.ChunkMap) - 1 {
 				str += ","
@@ -26,9 +34,7 @@ func (gossiper *Gossiper) receiveSearchReply(gossipPacket GossipPacket) {
 		}
 		gossiper.ToPrint <- str
 
-
-
-		searchFileChunksNotCasted, _ := gossiper.SearchedFiles.LoadOrStore(result.MetafileHash, make([]SearchedFileChunk, 0))
+		searchFileChunksNotCasted, _ := gossiper.SearchedFiles.LoadOrStore(hashHex, make([]SearchedFileChunk, 0))
 		searchFileChunks := searchFileChunksNotCasted.([]SearchedFileChunk)
 		for _, id := range result.ChunkMap {
 			exist := false
@@ -48,20 +54,24 @@ func (gossiper *Gossiper) receiveSearchReply(gossipPacket GossipPacket) {
 					gossiper.findFullMatches(result.FileName)
 				}
 			}
+			gossiper.SearchedFiles.Store(hashHex, searchFileChunks)
 		}
 	}
 }
 
+/*
+	forwardSearchReplyPacket takes care of forwarding a point-to-point search reply message to the right peer
+ */
 func (gossiper *Gossiper) forwardSearchReplyPacket(gossipPacket GossipPacket) {
 	//WE DECREASE AND DISCARD INVALID PACKET
-	gossipPacket.DataRequest.HopLimit--
-	if gossipPacket.DataRequest.HopLimit == 0 {
+	gossipPacket.SearchReply.HopLimit--
+	if gossipPacket.SearchReply.HopLimit == 0 {
 		return
 	}
 
-	nextHopAddr, exist := gossiper.DSDV.Load(gossipPacket.DataReply.Destination)
+	nextHopAddr, exist := gossiper.DSDV.Load(gossipPacket.SearchReply.Destination)
 	if !exist {
-		println("ERROR : don't know how to forward to " + gossipPacket.DataReply.Destination)
+		println("ERROR : don't know how to forward to " + gossipPacket.SearchReply.Destination)
 		return
 	}
 
@@ -69,6 +79,11 @@ func (gossiper *Gossiper) forwardSearchReplyPacket(gossipPacket GossipPacket) {
 	gossiper.ToSend <- packetToSend
 }
 
+/*
+	findFullMatches is called whenever the file with the given name is complete. The method takes care
+	to increase the fullMatches counter of all the searches that have a keyword that is a substring of
+	the filename
+ */
 func (gossiper *Gossiper) findFullMatches(fileName string) {
 	keywords := gossiper.ActiveSearches.GetSetCopy()
 	size := gossiper.ActiveSearches.Size()
@@ -76,11 +91,15 @@ func (gossiper *Gossiper) findFullMatches(fileName string) {
 		for _, keyword := range keywords[i] {
 			if strings.Contains(fileName, keyword) {
 				fullMatches, err := gossiper.ActiveSearches.IncrementFullMatchIndex(i)
-				if util.CheckAndPrintError(err){
+				if util.CheckAndPrintError(err) {
 					return
-				} else if fullMatches == DEFAULT_FULL_MATCHES {
+				} else if fullMatches == constants.DEFAULT_FULL_MATCHES {
 					gossiper.ToPrint <- "SEARCH FINISHED"
 					gossiper.ActiveSearches.Remove(i)
+					channel, exist := gossiper.FinishedSearches.Load(strings.Join(keywords[i], ","))
+					if exist {
+						channel.(chan Signal) <- Signal{}
+					}
 				}
 			}
 		}

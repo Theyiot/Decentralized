@@ -5,6 +5,12 @@ import (
 	"net"
 )
 
+/*
+	syncPeers takes care of syncing two peers (ourselves and the peer with addr). It first synchronize
+	the peer with ourselves, then ourselves and him, after which it returns that we are synced. The method
+	does not calls itself recursively explicitly, but calls two method that starts again the process
+	of rumormongering, which will in the end call this method again, until the two peers are synced
+ */
 func (gossiper *Gossiper) syncPeers(statusPacket GossipPacket, addr *net.UDPAddr) bool {
 	if gossiper.syncPeerWithMe(statusPacket, addr) {
 		if gossiper.syncMeWithPeer(statusPacket, addr) {
@@ -14,6 +20,10 @@ func (gossiper *Gossiper) syncPeers(statusPacket GossipPacket, addr *net.UDPAddr
 	return false
 }
 
+/*
+	syncPeerWithMe checks that we do not own a rumor that the other peer does not know. If we own one
+	such packet, then we send it to the other peer by rumormongering with him
+ */
 func (gossiper *Gossiper) syncPeerWithMe(statusPacket GossipPacket, peerAddr *net.UDPAddr) bool {
 	//LOOK FOR NOT UP-TO-DATE PACKETS
 	for _, status := range statusPacket.Status.Want {
@@ -58,6 +68,11 @@ func (gossiper *Gossiper) syncPeerWithMe(statusPacket GossipPacket, peerAddr *ne
 	return upToDate
 }
 
+/*
+	syncMeWithPeer checks that we own all the rumors that the other peer knows. If there is one
+	rumor we don't know, we send him our status so that the other peer know it has to send it
+	this packet
+ */
 func (gossiper *Gossiper) syncMeWithPeer(statusPacket GossipPacket, peerAddr *net.UDPAddr) bool {
 	for _, status := range statusPacket.Status.Want {
 		statusNextID := status.NextID

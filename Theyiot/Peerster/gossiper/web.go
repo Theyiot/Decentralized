@@ -9,7 +9,9 @@ import (
 	"os"
 )
 
-//MESSAGE POST
+/*
+	sendPublicMessage allows to send from the UI some public or rumor messages
+ */
 func sendPublicMessage(gossiper *Gossiper) http.HandlerFunc {
 	return func (w http.ResponseWriter, r *http.Request) {
 		var msg SingleStringJSON
@@ -30,15 +32,19 @@ func sendPublicMessage(gossiper *Gossiper) http.HandlerFunc {
 	}
 }
 
-//MESSAGE GET
+/*
+	receivePublicMessage allows the user to receive simple or rumor messages to display them on the UI
+ */
 func receivePublicMessage(gossiper *Gossiper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rumors := gossiper.GetRumorsAsList()
+		rumors := gossiper.getRumorsAsList()
 		json.NewEncoder(w).Encode(rumors)
 	}
 }
 
-//PEERS POST
+/*
+	addPeerFromWeb allows the user to add new peers from the UI
+ */
 func addPeerFromWeb(gossiper *Gossiper) http.HandlerFunc {
 	return func (w http.ResponseWriter, r *http.Request) {
 		var address SingleStringJSON
@@ -55,7 +61,9 @@ func addPeerFromWeb(gossiper *Gossiper) http.HandlerFunc {
 	}
 }
 
-//PEERS GET
+/*
+	refreshPeersAddress allows the user to display the latest update of the new peers' addresses on the UI
+ */
 func refreshPeersAddress(gossiper *Gossiper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		peers := gossiper.Peers.GetAddressesAsStringArray()
@@ -63,7 +71,10 @@ func refreshPeersAddress(gossiper *Gossiper) http.HandlerFunc {
 	}
 }
 
-//ID GET
+
+/*
+	getAndSetPersonalID allows the user to provide his personal identifiers to display them in the UI
+ */
 func getAndSetPersonalID(gossiper *Gossiper) http.HandlerFunc {
 	return func (w http.ResponseWriter, r *http.Request) {
 		id := WebServerID{ Name: gossiper.Name, Address: gossiper.GossipAddr }
@@ -71,14 +82,19 @@ func getAndSetPersonalID(gossiper *Gossiper) http.HandlerFunc {
 	}
 }
 
-//PEERS NAME GET
+/*
+	refreshPeersName allows the to display the latest update of the new peers' names on the UI
+ */
 func refreshPeersName(gossiper *Gossiper) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		names := gossiper.GetPeersNameAsMap()
+		names := gossiper.getPeersNameAsList()
 		json.NewEncoder(w).Encode(names)
 	}
 }
 
+/*
+	sendPrivateMessage allows to send from the UI some private messages
+ */
 func sendPrivateMessage(gossiper *Gossiper) http.HandlerFunc {
 	return func (w http.ResponseWriter, r *http.Request) {
 		var msg StringAndPeerJSON
@@ -95,13 +111,19 @@ func sendPrivateMessage(gossiper *Gossiper) http.HandlerFunc {
 	}
 }
 
+/*
+	receivePrivateMessage allows the user to receive private messages to display them on the UI
+ */
 func receivePrivateMessage(gossiper *Gossiper) http.HandlerFunc {
 	return func (w http.ResponseWriter, r *http.Request) {
-		mapMessages := gossiper.GetPrivateMessagesAsMap()
+		mapMessages := gossiper.getPrivateMessagesAsMap()
 		json.NewEncoder(w).Encode(mapMessages)
 	}
 }
 
+/*
+	indexFile allows the user to index a file he has chosen from the UI
+ */
 func indexFile(gossiper *Gossiper) http.HandlerFunc {
 	return func (w http.ResponseWriter, r *http.Request) {
 		var fileName SingleStringJSON
@@ -115,18 +137,24 @@ func indexFile(gossiper *Gossiper) http.HandlerFunc {
 			return
 		}
 		gossiper.indexFile(fileName.Text)
-		mapIndexedFiles := gossiper.GetIndexedFilesAsMap()
+		mapIndexedFiles := gossiper.getIndexedFilesAsMap()
 		json.NewEncoder(w).Encode(mapIndexedFiles)
 	}
 }
 
+/*
+	listIndexedFiles allows the user to obtain a list of all indexed files, in order to display them in the UI
+ */
 func listIndexedFiles(gossiper *Gossiper) http.HandlerFunc {
 	return func (w http.ResponseWriter, r *http.Request) {
-		mapIndexedFiles := gossiper.GetIndexedFilesAsMap()
+		mapIndexedFiles := gossiper.getIndexedFilesAsMap()
 		json.NewEncoder(w).Encode(mapIndexedFiles)
 	}
 }
 
+/*
+	requestFile allows the user to request a given file from the UI
+ */
 func requestFile(gossiper *Gossiper) http.HandlerFunc {
 	return func (w http.ResponseWriter, r *http.Request) {
 		var fileRequest FileRequestJSON
@@ -141,11 +169,14 @@ func requestFile(gossiper *Gossiper) http.HandlerFunc {
 		}
 
 		gossiper.requestFileFrom(fileRequest.FileName, fileRequest.Dest, fileRequest.Request)
-		mapIndexedFiles := gossiper.GetIndexedFilesAsMap()
+		mapIndexedFiles := gossiper.getIndexedFilesAsMap()
 		json.NewEncoder(w).Encode(mapIndexedFiles)
 	}
 }
 
+/*
+	This function takes care of starting the web server and to link all the function to the right path
+ */
 func (gossiper *Gossiper) StartWebServer(port string) {
 	if !util.CheckValidPort(port) {
 		os.Exit(0)

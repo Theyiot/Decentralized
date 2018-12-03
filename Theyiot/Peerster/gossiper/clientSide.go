@@ -5,6 +5,10 @@ import (
 	"github.com/dedis/protobuf"
 )
 
+/*
+	handleClient takes care of receiving and processing all the request from the client. It loops indefinitely
+	and waits for UDP packets from the client
+ */
 func (gossiper *Gossiper) handleClient() {
 	for {
 		buf := make([]byte, 4096)
@@ -13,7 +17,7 @@ func (gossiper *Gossiper) handleClient() {
 			continue
 		}
 
-		packet := ClientGossipPacket{}
+		packet := ClientPacket{}
 		err = protobuf.Decode(buf[:n], &packet)
 		if util.CheckAndPrintError(err) {
 			continue
@@ -23,7 +27,11 @@ func (gossiper *Gossiper) handleClient() {
 	}
 }
 
-func (gossiper *Gossiper) sendClientMessage(packet ClientGossipPacket) {
+/*
+	sendClientMessage takes care of processing the packets received from the client. It makes sure the packets
+	are valid and forwards the request to the right function
+ */
+func (gossiper *Gossiper) sendClientMessage(packet ClientPacket) {
 	if !checkExactlyOnePacketTypeClient(packet) {
 		println("CLIENT SIDE : More than one field of the packet was not <nil>, dropping this packet")
 		return
@@ -53,7 +61,10 @@ func (gossiper *Gossiper) sendClientMessage(packet ClientGossipPacket) {
 	}
 }
 
-func checkExactlyOnePacketTypeClient(gossipPacket ClientGossipPacket) bool {
+/*
+	checkExactlyOnePacketTypeClient checks that there is one and only one type of packet that is not nil
+ */
+func checkExactlyOnePacketTypeClient(gossipPacket ClientPacket) bool {
 	count := 0
 	if gossipPacket.Simple != nil { count++ }
 	if gossipPacket.Private != nil { count++ }

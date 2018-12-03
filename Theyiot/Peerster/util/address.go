@@ -6,6 +6,9 @@ import (
 	"strings"
 )
 
+/*
+	IsValidAddress checks whether the provided address, in the form ip:port has a valid IP address and a valid port
+ */
 func IsValidAddress(peer string) bool {
 	ipPort := strings.Split(peer, ":")
 	if len(ipPort) != 2 {
@@ -18,6 +21,9 @@ func IsValidAddress(peer string) bool {
 	return CheckValidIP(ip) && CheckValidPort(portStr)
 }
 
+/*
+	CheckValidIP checks whether a given IP address is actually one
+ */
 func CheckValidIP(ip string) bool {
 	if net.ParseIP(ip) == nil {
 		println("ERROR : Invalid IP Address for : " + ip)
@@ -26,6 +32,9 @@ func CheckValidIP(ip string) bool {
 	return true
 }
 
+/*
+	checkValidPort check that the provided port is valid and not reserved
+ */
 func CheckValidPort(portStr string) bool {
 	port, err := strconv.ParseInt(portStr, 10, 32)
 	if CheckAndPrintError(err) {

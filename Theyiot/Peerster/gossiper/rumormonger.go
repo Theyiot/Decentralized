@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+/*
+	rumormonger sends the rumor contained in the provided gossipPacket to the given address, and waits
+	either for a timeout or for a ACK from the peer we mongered with. For the latter, we make sure we
+	are synced with the peer before flipping a coin
+ */
 func (gossiper *Gossiper) rumormonger(gossipPacket GossipPacket, address *net.UDPAddr) {
 	gossiper.ToPrint <- "MONGERING with " + address.String()
 
@@ -35,6 +40,9 @@ func (gossiper *Gossiper) rumormonger(gossipPacket GossipPacket, address *net.UD
 	}
 }
 
+/*
+	flipACoin start again the rumormonger process with a random peer with a probability of one half (a coin toss)
+ */
 func (gossiper *Gossiper) flipACoin(gossipPacket GossipPacket, oldAddr *net.UDPAddr){
 	if rand.Int() % 2 == 0 {
 		newAddr := gossiper.Peers.ChooseRandomPeerExcept(oldAddr.String())

@@ -7,12 +7,18 @@ import (
 	"time"
 )
 
+/*
+	printMessages continuously waits for message to print in the terminal
+ */
 func (gossiper *Gossiper) printMessages() {
 	for str := range gossiper.ToPrint {
 		fmt.Println(str)
 	}
 }
 
+/*
+	sendPacket continuously waits for packets to send to other peers
+ */
 func (gossiper *Gossiper) sendPacket() {
 	for packet := range gossiper.ToSend {
 		bytes, err := protobuf.Encode(packet.GossipPacket)
@@ -23,13 +29,17 @@ func (gossiper *Gossiper) sendPacket() {
 	}
 }
 
+/*
+	antiEntropy sends a status packet to a random peer every second, in order to make sure that the entire
+	network is up-to-date
+ */
 func (gossiper *Gossiper) antiEntropy() {
 	for {
 		ticker := time.NewTicker(time.Second)
 
 		select {
 		case <- ticker.C:
-			if gossiper.Peers.GetSize() > 0 {
+			if !gossiper.Peers.IsEmpty() {
 				randomPeer := gossiper.Peers.ChooseRandomPeer()
 				gossiper.ToSend <- PacketToSend{ Address: randomPeer, GossipPacket: &GossipPacket{ Status: gossiper.constructStatuses() }}
 				ticker.Stop()
@@ -38,6 +48,11 @@ func (gossiper *Gossiper) antiEntropy() {
 	}
 }
 
+/*
+	routeRumor continuously sends empty rumor to a random peer in order to make sure that we know
+	every other peer in the network. The frequence at which we send these messages is choosable by
+	the user and by default is disabled
+ */
 func (gossiper *Gossiper) routeRumor(rtimer uint) {
 	gossiper.sendRouteRumor()
 	for {
@@ -50,6 +65,9 @@ func (gossiper *Gossiper) routeRumor(rtimer uint) {
 	}
 }
 
+/*
+	sendRouteRumor takes care of sending an empty rumor to a random peer
+ */
 func (gossiper *Gossiper) sendRouteRumor() {
 	if !gossiper.Peers.IsEmpty() { //WE DO NOTHING WHILE WE DON'T KNOW ONE PEER AT LEAST
 		id, _ := gossiper.VectorClock.LoadOrStore(gossiper.Name, uint32(1))

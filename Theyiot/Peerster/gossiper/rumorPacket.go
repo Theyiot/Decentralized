@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+/*
+	sendRumorPacket takes care of sending a rumor message to a given peer
+ */
 func (gossiper *Gossiper) sendRumorPacket(content string) {
 	str := "CLIENT MESSAGE " + content + gossiper.Peers.String()
 	gossiper.ToPrint <- str
@@ -14,7 +17,7 @@ func (gossiper *Gossiper) sendRumorPacket(content string) {
 	rumorMessage := RumorMessage{Text: content, ID: id.(uint32), Origin: gossiper.Name}
 	rumorPacket := GossipPacket{Rumor: &rumorMessage}
 	gossipPacketTimed := GossipPacketTimed{GossipPacket: rumorPacket, Timestamp: time.Now()}
-	gossiper.Rumors.Store(fmt.Sprint(id)+"@"+gossiper.Name, gossipPacketTimed)
+	gossiper.Rumors.Store(fmt.Sprint(id) + "@" + gossiper.Name, gossipPacketTimed)
 	gossiper.VectorClock.Store(gossiper.Name, id.(uint32)+uint32(1))
 
 
@@ -23,6 +26,9 @@ func (gossiper *Gossiper) sendRumorPacket(content string) {
 	}
 }
 
+/*
+	receiveRumorPacket handles the packets of rumor type
+ */
 func (gossiper *Gossiper) receiveRumorPacket(gossipPacket GossipPacket, addr *net.UDPAddr) {
 	id, origin, msg := gossipPacket.Rumor.ID, gossipPacket.Rumor.Origin, gossipPacket.Rumor.Text
 	senderAddr := addr.String()
@@ -55,7 +61,7 @@ func (gossiper *Gossiper) receiveRumorPacket(gossipPacket GossipPacket, addr *ne
 		GossipPacket: &GossipPacket{Status: gossiper.constructStatuses()}}
 
 	// WE RUMORMONGER ONLY IF WE KNOW ONE OTHER PEER THAT SENT THE RUMOR
-	if gossiper.Peers.GetSize() > 1 {
+	if gossiper.Peers.Size() > 1 {
 		gossiper.rumormonger(gossipPacket, gossiper.Peers.ChooseRandomPeerExcept(senderAddr))
 	}
 }

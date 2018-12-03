@@ -2,6 +2,7 @@ package util
 
 import (
 	"errors"
+	"sort"
 	"sync"
 	"sync/atomic"
 )
@@ -13,7 +14,10 @@ type FullMatchesSet struct {
 	lock     		sync.RWMutex
 }
 
-func (set *FullMatchesSet) Contains(str []string) bool {
+/*
+	contains checks whether our set contains the given list of keywords or not
+ */
+func (set *FullMatchesSet) contains(str []string) bool {
 	set.lock.Lock()
 	defer set.lock.Unlock()
 	for _, list := range set.keywords {
@@ -24,8 +28,14 @@ func (set *FullMatchesSet) Contains(str []string) bool {
 	return false
 }
 
+/*
+	Add allows the user to add a new search to the set of searches. The keywords are ordered in order to
+	ensure that two lists containing the same keywords but not in the same order are considered as
+	duplicate, since both searches looks for the same keywords
+ */
 func (set *FullMatchesSet) Add(str []string) {
-	if !set.Contains(str) {
+	sort.Strings(str)
+	if !set.contains(str) {
 		set.lock.Lock()
 		set.keywords = append(set.keywords, str)
 		set.fullMatches = append(set.fullMatches, 0)
@@ -34,12 +44,18 @@ func (set *FullMatchesSet) Add(str []string) {
 	}
 }
 
+/*
+	Size returns the number of searches actually running
+ */
 func (set *FullMatchesSet) Size() int {
 	set.lock.RLock()
 	defer set.lock.RUnlock()
 	return set.size
 }
 
+/*
+	IncrementFullMatchIndex increment the number of fullMatches for the i-th search. This is done atomically
+ */
 func (set *FullMatchesSet) IncrementFullMatchIndex(i int) (uint32, error) {
 	set.lock.Lock()
 	defer set.lock.Unlock()
@@ -49,6 +65,9 @@ func (set *FullMatchesSet) IncrementFullMatchIndex(i int) (uint32, error) {
 	return atomic.AddUint32(&set.fullMatches[i], 1), nil
 }
 
+/*
+	Remove takes care of removing the i-th element from our set
+ */
 func (set *FullMatchesSet) Remove(i int) {
 	set.lock.Lock()
 	defer set.lock.Unlock()
@@ -69,6 +88,9 @@ func (set *FullMatchesSet) Remove(i int) {
 	set.size--
 }
 
+/*
+	GetSetCopy returns a copy of the set of keywords
+ */
 func (set *FullMatchesSet) GetSetCopy() [][]string {
 	set.lock.RLock()
 	defer set.lock.RUnlock()
@@ -79,10 +101,16 @@ func (set *FullMatchesSet) GetSetCopy() [][]string {
 	return setCopy
 }
 
-func CreateStringSet() *FullMatchesSet {
+/*
+	CreateFullMatchesSet creates a FullMatchesSet with initially everything empty
+ */
+func CreateFullMatchesSet() *FullMatchesSet {
 	return &FullMatchesSet{ keywords: make([][]string, 0), fullMatches:make([]uint32, 0), size:0 }
 }
 
+/*
+	Checks whether two lists are equal. The two list that are passed to the method should be sorted
+ */
 func equals(l1, l2 []string) bool {
 	if len(l1) != len(l2) {
 		return false

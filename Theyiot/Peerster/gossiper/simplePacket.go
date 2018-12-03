@@ -2,6 +2,9 @@ package gossiper
 
 import "strings"
 
+/*
+	receiveSimplePacket handles the packets of simple type
+ */
 func (gossiper *Gossiper) receiveSimplePacket(gossipPacket GossipPacket) {
 	origin := gossipPacket.Simple.OriginalName
 	relayAddr := gossipPacket.Simple.RelayPeerAddr
@@ -22,6 +25,9 @@ func (gossiper *Gossiper) receiveSimplePacket(gossipPacket GossipPacket) {
 	}
 }
 
+/*
+	sendSimplePacket takes care of sending a simple message to all known peers
+ */
 func (gossiper *Gossiper) sendSimplePacket(content string) {
 	str := "CLIENT MESSAGE " + content + gossiper.Peers.String()
 	gossiper.ToPrint <- str

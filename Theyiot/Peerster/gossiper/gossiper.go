@@ -2,17 +2,23 @@ package gossiper
 
 import (
 	"flag"
+	"github.com/Theyiot/Peerster/constants"
 	"github.com/Theyiot/Peerster/util"
 	"net"
 	"strings"
 	"sync"
 )
 
+
+/*
+	StartGossip takes care of launching the different functionalities of our peerster and to parse the
+	parameters provided by the client
+ */
 func StartGossip() {
 	//FLAGS DEFINITION
-	uiPort := flag.String("UIPort", "8080", "Port for the UI client")
-	gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "ip:port for the receiver")
-	name := flag.String("name", "nodeA", "name of the gossiper")
+	uiPort := flag.String("UIPort", constants.DEFAULT_PORT, "Port for the UI client")
+	gossipAddr := flag.String("gossipAddr", constants.DEFAULT_GOSSIP_ADDR, "ip:port for the receiver")
+	name := flag.String("name", constants.DEFAULT_NAME, "name of the gossiper")
 	peersToSplit := flag.String("peers", "", "comma-separated list of peers of the form ip:port")
 	simple := flag.Bool("simple", false, "run gossiper in simple broadcast mode")
 	rtimer := flag.Uint("rtimer", 0, "Time between each route rumor")
@@ -20,15 +26,15 @@ func StartGossip() {
 
 	peers := util.CreateAddrSet(strings.Replace(*peersToSplit, " ", "", -1))
 
-	uiServerAddr, err := net.ResolveUDPAddr("udp4", "127.0.0.1:" + *uiPort)
+	uiServerAddr, err := net.ResolveUDPAddr(constants.UDP_VERSION, constants.LOCALHOST + ":" + *uiPort)
 	util.FailOnError(err)
-	gossipServerAddr, err := net.ResolveUDPAddr("udp4", *gossipAddr)
+	gossipServerAddr, err := net.ResolveUDPAddr(constants.UDP_VERSION, *gossipAddr)
 	util.FailOnError(err)
 
-	uiServer, err := net.ListenUDP("udp4", uiServerAddr)
+	uiServer, err := net.ListenUDP(constants.UDP_VERSION, uiServerAddr)
 	util.FailOnError(err)
 	defer uiServer.Close()
-	gossipServer, err := net.ListenUDP("udp4", gossipServerAddr)
+	gossipServer, err := net.ListenUDP(constants.UDP_VERSION, gossipServerAddr)
 	util.FailOnError(err)
 	defer gossipServer.Close()
 
@@ -41,14 +47,14 @@ func StartGossip() {
 		Peers:         peers,
 		VectorClock:   sync.Map{},
 		Rumors:        sync.Map{},
-		DSDV:          sync.Map{},
 		Privates:      sync.Map{},
+		DSDV:          sync.Map{},
 		ReceivingFile: sync.Map{},
 		IndexedFiles:  sync.Map{},
 		SearchedFiles: sync.Map{},
 		SearchRequests:sync.Map{},
 		Acks:          sync.Map{},
-		ActiveSearches:	util.CreateStringSet(),
+		ActiveSearches:	util.CreateFullMatchesSet(),
 		ToPrint:       make(chan string),
 		ToSend:        make(chan PacketToSend),
 	}

@@ -5,6 +5,9 @@ import (
 	"net"
 )
 
+/*
+	receiveStatusPacket handles the packets of status type
+ */
 func (gossiper *Gossiper) receiveStatusPacket(statusPacket GossipPacket, addr *net.UDPAddr) {
 	str := "STATUS from " + addr.String()
 	for _, status := range statusPacket.Status.Want {

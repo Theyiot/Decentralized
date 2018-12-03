@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"github.com/Theyiot/Peerster/constants"
 	"github.com/Theyiot/Peerster/util"
 	"math/rand"
 	"net"
@@ -12,8 +13,12 @@ import (
 	"strconv"
 )
 
+/*
+	indexFile takes care of indexing a file that is in the "_SharedFiles" folder, the user simply has to
+	provide the name of the file to index (if the file is placed in the right folder)
+ */
 func (gossiper *Gossiper) indexFile(fileName string) {
-	file, err := os.Open(PATH_SHARED_FILES + fileName)
+	file, err := os.Open(constants.PATH_SHARED_FILES + fileName)
 	defer file.Close()
 	if util.CheckAndPrintError(err) {
 		return
@@ -21,15 +26,15 @@ func (gossiper *Gossiper) indexFile(fileName string) {
 	fileStat, err := file.Stat()
 	if util.CheckAndPrintError(err) {
 		return
-	} else if fileStat.Size() > CHUNK_SIZE * sha256.Size {
+	} else if fileStat.Size() > constants.CHUNK_SIZE * sha256.Size {
 		println("Cannot index file " + fileName + " because it is too big : " + fmt.Sprint(fileStat.Size()) +
-			" instead of at most " + fmt.Sprint(CHUNK_SIZE * sha256.Size))
+			" instead of at most " + fmt.Sprint(constants.CHUNK_SIZE * sha256.Size))
 		return
 	}
 	totalByte := int64(0)
 	metaFile := make([]byte, 0)
 	for totalByte < fileStat.Size() {
-		chunk := make([]byte, CHUNK_SIZE)
+		chunk := make([]byte, constants.CHUNK_SIZE)
 		n, err := file.Read(chunk)
 		if util.CheckAndPrintError(err) {
 			return
@@ -37,7 +42,7 @@ func (gossiper *Gossiper) indexFile(fileName string) {
 		hash := sha256.Sum256(chunk[:n])
 		hashString := hex.EncodeToString(hash[:])
 		metaFile = append(metaFile, hash[:]...)
-		err = writeFile(hashString, chunk[:n])
+		err = writeChunk(hashString, chunk[:n])
 		if util.CheckAndPrintError(err) {
 			return
 		}
@@ -48,22 +53,23 @@ func (gossiper *Gossiper) indexFile(fileName string) {
 	indexedFile := IndexedFile{FileName: fileName, FileSize: fileStat.Size(), MetaFile: metaFile}
 	gossiper.IndexedFiles.Store(metaHashHex, indexedFile)
 
-	util.CheckAndPrintError(writeFile(metaHashHex, metaFile))
+	util.CheckAndPrintError(writeChunk(metaHashHex, metaFile))
 	return
 }
 
 /*
-This method allows the user to download and store, with a given file name, a file corresponding to the provided metahash
+	requestFile allows the user to download and store a file from multiple peers. Hence, the user only needs to
+	provide the name under which the file needs to be stored and the metaHash of that file
  */
-func (gossiper *Gossiper) requestFile(fileName string, hashHex string) {
-	searchedFile, found := gossiper.SearchedFiles.Load(hashHex)
+func (gossiper *Gossiper) requestFile(fileName string, metaHashHex string) {
+	searchedFile, found := gossiper.SearchedFiles.Load(metaHashHex)
 	if !found {
-		println("Requesting an unknown file from multiple peers for : " + hashHex)
+		println("ERROR : Requesting an unknown file from multiple peers")
 		return
 	}
 	searchedFileChunks := searchedFile.([]SearchedFileChunk)
 	if len(searchedFileChunks) < 1 || searchedFileChunks[0].ChunkCount != uint64(len(searchedFileChunks)) {
-		println("Trying to request for which we don't know where to find all the chunks")
+		println("ERROR : Trying to request for which we don't know where to find all the chunks")
 		return
 	}
 	sort.Slice(searchedFileChunks, func(i, j int) bool {
@@ -71,15 +77,15 @@ func (gossiper *Gossiper) requestFile(fileName string, hashHex string) {
 	})
 
 	destination := searchedFileChunks[0].owningPeers[0]
-	metaFile, success := gossiper.requestMetaFile(fileName, destination, hashHex)
-	if !success || !checkAndPrintSameHash(hashHex, metaFile){
+	metaFile, success := gossiper.requestMetaFile(fileName, destination, metaHashHex)
+	if !success || !checkAndPrintSameHash(metaHashHex, metaFile){
 		return
 	}
 
-	hashesCopy := gossiper.GetHashesCopy(metaFile)
+	hashesCopy := gossiper.getHashesAsList(metaFile)
 	indexedFile := IndexedFile{MetaFile: metaFile, FileName: fileName}
 
-	file, err := os.Create(PATH_DOWNOADS + fileName)
+	file, err := os.Create(constants.PATH_DOWNOADS + fileName)
 	if util.CheckAndPrintError(err) {
 		return
 	}
@@ -94,9 +100,13 @@ func (gossiper *Gossiper) requestFile(fileName string, hashHex string) {
 	gossiper.ToPrint <- "RECONSTRUCTED file " + fileName
 
 	indexedFile.FileSize = int64(fileSize)
-	gossiper.IndexedFiles.Store(hashHex, indexedFile)
+	gossiper.IndexedFiles.Store(metaHashHex, indexedFile)
 }
 
+/*
+	requestFileFrom allows the user to download and store a file from a given peer. This method assumes that
+	the user is sure that the peer from who it requests that file has the entirety of it
+ */
 func (gossiper *Gossiper) requestFileFrom(fileName string, destination string, hashHex string) {
 	metaFile, success := gossiper.requestMetaFile(fileName, destination, hashHex)
 	if !success {
@@ -104,9 +114,9 @@ func (gossiper *Gossiper) requestFileFrom(fileName string, destination string, h
 	}
 
 	var indexedFile IndexedFile
-	hashesCopy := gossiper.GetHashesCopy(metaFile)
+	hashesCopy := gossiper.getHashesAsList(metaFile)
 
-	file, err := os.Create(PATH_DOWNOADS + fileName)
+	file, err := os.Create(constants.PATH_DOWNOADS + fileName)
 	if util.CheckAndPrintError(err) {
 		return
 	}
@@ -123,6 +133,9 @@ func (gossiper *Gossiper) requestFileFrom(fileName string, destination string, h
 	gossiper.IndexedFiles.Store(hashHex, indexedFile)
 }
 
+/*
+	requestFileChunk allows the user to download and store a chunk of a file from a given peer
+ */
 func (gossiper *Gossiper) requestFileChunk(fileName string, destination string, request []byte, i int, file *os.File) int {
 	str := "DOWNLOADING " + fileName + " chunk " + strconv.Itoa(i + 1) + " from " + destination
 	gossiper.ToPrint <- str
@@ -147,12 +160,15 @@ func (gossiper *Gossiper) requestFileChunk(fileName string, destination string, 
 		return 0
 	}
 	if util.CheckAndPrintError(err) {
-		os.Remove(PATH_SHARED_FILES + fileName)
+		os.Remove(constants.PATH_SHARED_FILES + fileName)
 		return 0
 	}
 	return n
 }
 
+/*
+	requestMetaFile allows the user to download and store a metaFile from a given peer
+ */
 func (gossiper *Gossiper) requestMetaFile(fileName, destination, hashHex string) ([]byte, bool) {
 	addrNotCasted, exist := gossiper.DSDV.Load(destination)
 	if !exist {
@@ -176,7 +192,11 @@ func (gossiper *Gossiper) requestMetaFile(fileName, destination, hashHex string)
 	return metaFile, true
 }
 
-func (gossiper *Gossiper) GetHashesCopy(metaFile []byte) [][]byte {
+/*
+	getHashesAsList takes as input a metaFile, which it converts to a list of hash, which is more convenient
+	for the downloading process
+ */
+func (gossiper *Gossiper) getHashesAsList(metaFile []byte) [][]byte {
 	hashes := make([][]byte, 0)
 
 	for i := 0 ; i < len(metaFile) / sha256.Size ; i++ {
@@ -194,8 +214,13 @@ func (gossiper *Gossiper) GetHashesCopy(metaFile []byte) [][]byte {
 	return hashesCopy
 }
 
-func writeFile(fileName string, data []byte) error {
-	fileTmp, err := os.Create(PATH_FILE_CHUNKS + fileName)
+/*
+	writeChunk obviously takes care of writing a chunk, given the hash of this chunk and the data. It writes
+	it in the hidden "._FileChunks" folder, to allow the user to keep his indexed files over multiple usage
+	of the program
+ */
+func writeChunk(hashHex string, data []byte) error {
+	fileTmp, err := os.Create(constants.PATH_FILE_CHUNKS + hashHex)
 	if err != nil {
 		return err
 	}
@@ -214,17 +239,20 @@ func writeFile(fileName string, data []byte) error {
 	return nil
 }
 
-func readFile(hash string) ([]byte, error) {
+/*
+	readChunk obviously takes care of reading the file corresponding to the given hash, from the "._FileChunks" folder
+ */
+func readChunk(hashHex string) ([]byte, error) {
 	var stat os.FileInfo
 	var err error
-	if stat, err = os.Stat(PATH_FILE_CHUNKS + hash); os.IsNotExist(err) {
+	if stat, err = os.Stat(constants.PATH_FILE_CHUNKS + hashHex); os.IsNotExist(err) {
 		return []byte{}, err
 	}
-	fileTmp, err := os.Open(PATH_FILE_CHUNKS + hash)
+	fileTmp, err := os.Open(constants.PATH_FILE_CHUNKS + hashHex)
 	if err != nil {
 		return []byte{}, err
 	}
-	buffer := make([]byte, CHUNK_SIZE)
+	buffer := make([]byte, constants.CHUNK_SIZE)
 	byteRead := int64(0)
 	for byteRead < stat.Size() {
 		byteTmp, err := fileTmp.Read(buffer[byteRead:])
