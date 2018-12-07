@@ -99,7 +99,7 @@ func (set *AddrSet) ChooseRandomPeerExcept(except string) *net.UDPAddr {
 }
 
 /*
-	GetAddressesExcept returns the list of addresses except the one that is given as parameter
+	GetAddressesExcept returns the blocks of addresses except the one that is given as parameter
  */
 func (set *AddrSet) GetAddressesExcept(except string) []*net.UDPAddr {
 	addressesCopy := make([]*net.UDPAddr, 0)
@@ -127,7 +127,7 @@ func (set *AddrSet) GetAddresses() []*net.UDPAddr {
 }
 
 /*
-	ChooseRandomPeer return a peer chosen at random from the list. This method assumes that the user checks
+	ChooseRandomPeer return a peer chosen at random from the blocks. This method assumes that the user checks
 	that the set is not empty before calling it. However, if the user do call with an empty set, the method
 	will display an error message and return a nil address
  */
@@ -135,14 +135,14 @@ func (set *AddrSet) ChooseRandomPeer() *net.UDPAddr {
 	set.lock.RLock()
 	defer set.lock.RUnlock()
 	if set.Size() == 0 {
-		println("Cannot return random peer from an empty list")
+		println("Cannot return random peer from an empty blocks")
 		return nil
 	}
 	return set.addresses[rand.Intn(len(set.addresses))]
 }
 
 /*
-	GetAddressesAsStringArray returns a list of all the addresses in the set, in the form of a string array
+	GetAddressesAsStringArray returns a blocks of all the addresses in the set, in the form of a string array
  */
 func (set *AddrSet) GetAddressesAsStringArray() []string {
 	addresses := make([]string, 0)
@@ -158,6 +158,7 @@ func (set *AddrSet) GetAddressesAsStringArray() []string {
 	CreateAddrSet creates an AddrSet from the given string, that may be empty or not
  */
 func CreateAddrSet(str string) *AddrSet {
+	str = strings.Replace(str, " ", "", -1)
 	peers := AddrSet{ addresses: make([]*net.UDPAddr, 0) }
 	if strings.EqualFold(str, "") {
 		return &peers

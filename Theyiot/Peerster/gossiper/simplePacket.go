@@ -1,7 +1,5 @@
 package gossiper
 
-import "strings"
-
 /*
 	receiveSimplePacket handles the packets of simple type
  */
@@ -16,13 +14,7 @@ func (gossiper *Gossiper) receiveSimplePacket(gossipPacket GossipPacket) {
 	gossipPacket.Simple.RelayPeerAddr = gossiper.GossipAddr
 
 	// TRANSMITTING PACKET TO ALL KNOWN PEERS EXCEPT RELAY PEER
-	for _, address := range gossiper.Peers.GetAddresses() {
-		if strings.EqualFold(address.String(), relayAddr) {
-			continue
-		}
-
-		gossiper.ToSend <- PacketToSend{Address: address, GossipPacket: &gossipPacket}
-	}
+	gossiper.broadcastGossipPacket(gossipPacket, gossiper.Peers.GetAddressesExcept(relayAddr))
 }
 
 /*
@@ -31,12 +23,10 @@ func (gossiper *Gossiper) receiveSimplePacket(gossipPacket GossipPacket) {
 func (gossiper *Gossiper) sendSimplePacket(content string) {
 	str := "CLIENT MESSAGE " + content + gossiper.Peers.String()
 	gossiper.ToPrint <- str
-	simpleMsg := SimpleMessage{Contents: content, RelayPeerAddr: gossiper.GossipAddr, OriginalName: gossiper.Name}
-	simplePacket := GossipPacket{Simple: &simpleMsg}
-	simplePacket.Simple.OriginalName = gossiper.Name
-	simplePacket.Simple.RelayPeerAddr = gossiper.GossipAddr
+	simpleMessage := SimpleMessage{Contents: content, RelayPeerAddr: gossiper.GossipAddr, OriginalName: gossiper.Name}
+	gossipPacket := GossipPacket{Simple: &simpleMessage}
+	gossipPacket.Simple.OriginalName = gossiper.Name
+	gossipPacket.Simple.RelayPeerAddr = gossiper.GossipAddr
 
-	for _, address := range gossiper.Peers.GetAddresses() {
-		gossiper.ToSend <- PacketToSend{Address: address, GossipPacket: &simplePacket}
-	}
+	gossiper.broadcastGossipPacket(gossipPacket, gossiper.Peers.GetAddresses())
 }

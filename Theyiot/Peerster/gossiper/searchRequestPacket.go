@@ -26,7 +26,7 @@ func (gossiper *Gossiper) sendSearchRequest(keywords []string, budget uint64) {
 		gossiper.sendSearchPacket(budget, gossiper.Name, keywords, gossiper.Peers.GetAddresses())
 		return
 	}
-	for budget <= constants.DEFAULT_MAX_BUDGET{
+	for budget <= constants.MAX_BUDGET {
 		gossiper.sendSearchPacket(budget, gossiper.Name, keywords, gossiper.Peers.GetAddresses())
 		timer := time.NewTicker(time.Second)
 		select {

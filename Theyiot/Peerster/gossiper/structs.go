@@ -1,6 +1,8 @@
 package gossiper
 
 import (
+	"crypto/sha256"
+	"github.com/Theyiot/Peerster/constants"
 	"github.com/Theyiot/Peerster/util"
 	"net"
 	"sync"
@@ -150,19 +152,21 @@ type TxPublish struct {
 	File		File
 	HopLimit	uint32
 }
-type BlockPublish struct {
-	Block		Block
-	HopLimit	uint32
-}
+
 type File struct {
 	Name			string
 	Size			int64
 	MetafileHash	[]byte
 }
 
+type BlockPublish struct {
+	Block		Block
+	HopLimit	uint32
+}
+
 type Block struct {
-	PrevHash		[32]byte
-	Nonce			[32]byte
+	PrevHash		[sha256.Size]byte
+	Nonce			[constants.NOUNCE_SIZE]byte
 	Transactions	[]TxPublish
 }
 
@@ -173,20 +177,26 @@ type Gossiper struct {
 	GossipServer   		*net.UDPConn
 	Name           		string
 	Simple         		bool
+	CurrentBlock		*util.CurrentBlockHash
+	Transactions		*TransactionsSet
 	Peers          		*util.AddrSet
+	ActiveSearches		*util.FullMatchesSet
+	NameToMetaHash		sync.Map //Map[name]MetaHash
 	VectorClock    		sync.Map //Map[origin]id
 	Rumors         		sync.Map //Map[id@origin]GossipPacket	(only rumors)
 	Privates       		sync.Map //Map[origin]GossipPacket		(only privates)
 	DSDV           		sync.Map //Map[origin]*net.UDPAddr
-	IndexedFiles   		sync.Map //Map[metaHash(string)]IndexedFile
-	ReceivingFile  		sync.Map //Map[net.UDPAddr]chan([]byte)
-	SearchedFiles  		sync.Map //Map[metahash]SearchedFileChunk
-	Acks           		sync.Map //Map[origin + id + address]chan(statusPacket)
-	SearchRequests 		sync.Map //Map[origin + keyword]SearchRequests
-	FinishedSearches	sync.Map //Map[keywords]chan(Signal)
-	ActiveSearches		*util.FullMatchesSet
-	ToPrint     		chan string
-	ToSend 		        chan PacketToSend
+	IndexedFiles      	sync.Map //Map[metaHash(string)]IndexedFile
+	ReceivingFile     	sync.Map //Map[net.UDPAddr]chan([]byte)
+	SearchedFiles     	sync.Map //Map[metahash]SearchedFileChunk
+	Acks              	sync.Map //Map[origin + id + address]chan(statusPacket)
+	SearchRequests    	sync.Map //Map[origin + keyword]SearchRequests
+	FinishedSearches  	sync.Map //Map[keywords]chan(Signal)
+	Blockchain        	sync.Map //Map[blockHash]block
+	ToPrint          	chan string
+	ToSend            	chan PacketToSend
+	ToAddToBlockchain 	chan Block
+	BlockMined        	chan Signal
 }
 
 // WEB STRUCTS
@@ -214,6 +224,11 @@ type WebServerID  struct {
 type PacketToSend struct {
 	GossipPacket *GossipPacket
 	Address      *net.UDPAddr
+}
+
+type CurrentBlock struct {
+	HashHex		string
+	lock		sync.RWMutex
 }
 
 type Signal struct {}

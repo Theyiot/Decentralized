@@ -5,7 +5,6 @@ import (
 	"github.com/Theyiot/Peerster/constants"
 	"github.com/Theyiot/Peerster/util"
 	"net"
-	"strings"
 	"sync"
 )
 
@@ -24,8 +23,6 @@ func StartGossip() {
 	rtimer := flag.Uint("rtimer", 0, "Time between each route rumor")
 	flag.Parse()
 
-	peers := util.CreateAddrSet(strings.Replace(*peersToSplit, " ", "", -1))
-
 	uiServerAddr, err := net.ResolveUDPAddr(constants.UDP_VERSION, constants.LOCALHOST + ":" + *uiPort)
 	util.FailOnError(err)
 	gossipServerAddr, err := net.ResolveUDPAddr(constants.UDP_VERSION, *gossipAddr)
@@ -39,24 +36,30 @@ func StartGossip() {
 	defer gossipServer.Close()
 
 	gossiper := Gossiper{
-		UIServer:      uiServer,
-		GossipAddr:    *gossipAddr,
-		GossipServer:  gossipServer,
-		Name:          *name,
-		Simple:        *simple,
-		Peers:         peers,
-		VectorClock:   sync.Map{},
-		Rumors:        sync.Map{},
-		Privates:      sync.Map{},
-		DSDV:          sync.Map{},
-		ReceivingFile: sync.Map{},
-		IndexedFiles:  sync.Map{},
-		SearchedFiles: sync.Map{},
-		SearchRequests:sync.Map{},
-		Acks:          sync.Map{},
-		ActiveSearches:	util.CreateFullMatchesSet(),
-		ToPrint:       make(chan string),
-		ToSend:        make(chan PacketToSend),
+		UIServer:      		uiServer,
+		GossipAddr:    		*gossipAddr,
+		GossipServer:  		gossipServer,
+		Name:          		*name,
+		Simple:        		*simple,
+		CurrentBlock:		util.CreateCurrentBlockHash(),
+		Transactions:		createTransactionsSet(),
+		Peers:         		util.CreateAddrSet(*peersToSplit),
+		ActiveSearches:		util.CreateFullMatchesSet(),
+		NameToMetaHash:		sync.Map{},
+		VectorClock:   		sync.Map{},
+		Rumors:        		sync.Map{},
+		Privates:      		sync.Map{},
+		DSDV:          		sync.Map{},
+		ReceivingFile: 		sync.Map{},
+		IndexedFiles:  		sync.Map{},
+		SearchedFiles: 		sync.Map{},
+		SearchRequests:		sync.Map{},
+		Acks:          		sync.Map{},
+		Blockchain:			sync.Map{},
+		BlocksMined:		sync.Map{},
+		ToPrint:       		make(chan string),
+		ToSend:        		make(chan PacketToSend),
+		ToAddToBlockchain:	make(chan Block),
 	}
 
 	//UI COMMUNICATION
@@ -80,6 +83,9 @@ func StartGossip() {
 
 	//OPENING WEB SERVER
 	go gossiper.StartWebServer(*uiPort)
+
+	//ADDING BLOCK TO BLOCKCHAIN
+	go gossiper.addBlockToBlockchain()
 
 	//PRINTING CONTENTS
 	gossiper.printMessages()

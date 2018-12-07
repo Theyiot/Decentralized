@@ -1,7 +1,12 @@
 package gossiper
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"github.com/Theyiot/Peerster/constants"
 	"github.com/Theyiot/Peerster/util"
+	"math/rand"
+	"net"
 	"sort"
 	"strconv"
 	"strings"
@@ -100,7 +105,44 @@ func (gossiper *Gossiper) constructStatuses() *StatusPacket {
 	return &StatusPacket{ Want: statuses }
 }
 
+func (gossiper *Gossiper) broadcastGossipPacket(gossipPacket GossipPacket, addresses []*net.UDPAddr) {
+	for _, peer := range addresses {
+		gossiper.ToSend <- PacketToSend{ GossipPacket:&gossipPacket, Address:peer }
+	}
+}
 
+func (gossiper *Gossiper) mineBlock(prevHash [32]byte) {
+	newBlock := Block{ PrevHash:prevHash }
+	var hash [sha256.Size]byte
+
+	for {
+		select {
+		case <- gossiper.BlockMined:
+			return
+		default:
+			newBlock.Nonce = generateRandomNounce()
+			hash = newBlock.Hash()
+			if hash[0] == 0 && hash[1] == 0 {
+				break
+			}
+		}
+	}
+
+	newHashHex := hex.EncodeToString(hash[:])
+	gossiper.ToPrint <- "FOUND-BLOCK " + newHashHex
+	gossipPacket := GossipPacket{ BlockPublish:&BlockPublish{ Block:newBlock, HopLimit:constants.HOP_LIMIT_BIG } }
+	gossiper.ToAddToBlockchain <- newBlock
+	gossiper.broadcastGossipPacket(gossipPacket, gossiper.Peers.GetAddresses())
+
+	gossiper.mineBlock(hash)
+}
+
+func generateRandomNounce() (nounce [32]byte) {
+	random := make([]byte, constants.NOUNCE_SIZE)
+	rand.Read(random)
+	copy(nounce[:], random)
+	return
+}
 
 
 

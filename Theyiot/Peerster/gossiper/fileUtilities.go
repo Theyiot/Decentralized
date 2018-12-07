@@ -53,6 +53,15 @@ func (gossiper *Gossiper) indexFile(fileName string) {
 	indexedFile := IndexedFile{FileName: fileName, FileSize: fileStat.Size(), MetaFile: metaFile}
 	gossiper.IndexedFiles.Store(metaHashHex, indexedFile)
 
+	fileTransaction := File{ Name: fileName, Size:totalByte, MetafileHash:metaFile }
+	transaction := TxPublish{ HopLimit:constants.HOP_LIMIT_SMALL, File: fileTransaction}
+	_, exist := gossiper.NameToMetaHash.Load(transaction.File.Name)
+	if exist {
+		return
+	}
+	gossiper.Transactions.Add(&transaction)
+	gossiper.broadcastGossipPacket(GossipPacket{ TxPublish: &transaction }, gossiper.Peers.GetAddresses())
+
 	util.CheckAndPrintError(writeChunk(metaHashHex, metaFile))
 	return
 }

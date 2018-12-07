@@ -53,6 +53,10 @@ func (gossiper *Gossiper) handleGossip() {
 				gossiper.receiveSearchRequest(gossipPacket, addr)
 			} else if gossipPacket.SearchReply != nil { //DATA REPLY PACKET
 				gossiper.receiveSearchReply(gossipPacket, addr)
+			} else if gossipPacket.TxPublish != nil {
+				gossiper.receiveTxPublish(gossipPacket, addr)
+			} else if gossipPacket.BlockPublish != nil {
+				gossiper.receiveBlockPublish(gossipPacket, addr)
 			} else {
 				println("Received packet type that should not be sent to other peer")
 			}
@@ -73,6 +77,8 @@ func checkExactlyOnePacketType(gossipPacket GossipPacket) bool {
 	if gossipPacket.DataReply != nil { count++ }
 	if gossipPacket.SearchRequest != nil { count++ }
 	if gossipPacket.SearchReply != nil { count++ }
+	if gossipPacket.TxPublish != nil { count++ }
+	if gossipPacket.BlockPublish != nil { count++ }
 	if count == 0 {
 		println("Found 0 matching type of packet")
 	}

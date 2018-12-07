@@ -15,15 +15,12 @@ func (gossiper *Gossiper) sendRumorPacket(content string) {
 	id, _ := gossiper.VectorClock.LoadOrStore(gossiper.Name, uint32(1))
 
 	rumorMessage := RumorMessage{Text: content, ID: id.(uint32), Origin: gossiper.Name}
-	rumorPacket := GossipPacket{Rumor: &rumorMessage}
-	gossipPacketTimed := GossipPacketTimed{GossipPacket: rumorPacket, Timestamp: time.Now()}
+	gossipPacket := GossipPacket{Rumor: &rumorMessage}
+	gossipPacketTimed := GossipPacketTimed{GossipPacket: gossipPacket, Timestamp: time.Now()}
 	gossiper.Rumors.Store(fmt.Sprint(id) + "@" + gossiper.Name, gossipPacketTimed)
 	gossiper.VectorClock.Store(gossiper.Name, id.(uint32)+uint32(1))
 
-
-	for _, address := range gossiper.Peers.GetAddresses() {
-		gossiper.ToSend <- PacketToSend{Address: address, GossipPacket: &rumorPacket}
-	}
+	gossiper.broadcastGossipPacket(gossipPacket, gossiper.Peers.GetAddresses())
 }
 
 /*

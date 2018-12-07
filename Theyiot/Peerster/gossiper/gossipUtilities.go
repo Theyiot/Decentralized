@@ -1,9 +1,12 @@
 package gossiper
 
 import (
+	"encoding/hex"
 	"fmt"
 	"github.com/Theyiot/Peerster/util"
 	"github.com/dedis/protobuf"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -84,4 +87,79 @@ func (gossiper *Gossiper) sendRouteRumor() {
 		peerAddr := gossiper.Peers.ChooseRandomPeer()
 		gossiper.ToSend <- PacketToSend{GossipPacket: &gossipPacket, Address: peerAddr}
 	}
+}
+
+/*
+	sendPacket continuously waits for packets to send to other peers
+ */
+func (gossiper *Gossiper) addBlockToBlockchain() {
+	for block := range gossiper.ToAddToBlockchain {
+		newHash := block.Hash()
+		newHashHex := hex.EncodeToString(newHash[:])
+		prevHashHex := hex.EncodeToString(block.PrevHash[:])
+		//CHECKING IF WE ARE ON LONGEST CHAIN
+		if prevHashHex == gossiper.CurrentBlock.GetCurrentHash() {
+			str := gossiper.printChain(block)
+			gossiper.ToPrint <- str
+		}
+		gossiper.Blockchain.Store(newHashHex, block)
+
+		if gossiper.CurrentBlock.GetCurrentHash() == prevHashHex {
+			gossiper.CurrentBlock.IncrementDepth()
+			gossiper.CurrentBlock.SetCurrentHash(newHashHex)
+			for _, transaction := range block.Transactions {
+				gossiper.NameToMetaHash.Store(transaction.File.Name, transaction.File.MetafileHash)
+			}
+			gossiper.BlockMined <- Signal{}
+			gossiper.mineBlock(newHash)
+		} else {
+			newDepth := gossiper.computeDepth(newHashHex)
+			if newDepth > gossiper.CurrentBlock.GetDepth() {
+				gossiper.ToPrint <- "FORK-LONGER rewind " + " blocks"
+				gossiper.switchBranch(prevHashHex)
+				gossiper.CurrentBlock.SetDepth(newDepth)
+			} else {
+				gossiper.ToPrint <- "FORK-SHORTER " + newHashHex
+			}
+		}
+	}
+}
+
+func (gossiper *Gossiper) switchBranch(prevHashHex string) {
+	gossiper.NameToMetaHash = sync.Map{}
+	hashHex := prevHashHex
+	for {
+		block, exist := gossiper.Blockchain.Load(hashHex)
+		if !exist {
+			return
+		}
+		for _, transaction := range block.(Block).Transactions {
+			gossiper.NameToMetaHash.Store(transaction.File.Name, transaction.File.MetafileHash)
+		}
+		gossiper.Transactions.flushFromBlock(block.(Block))
+		hashHex = hex.EncodeToString(block.(Block).PrevHash[:])
+	}
+}
+
+func (gossiper *Gossiper) printChain(block Block) string {
+	str := "CHAIN"
+	for {
+		str += " " + printBlock(block)
+		newBlock, exist := gossiper.Blockchain.Load(hex.EncodeToString(block.PrevHash[:]))
+		if !exist {
+			break
+		}
+		block = newBlock.(Block)
+	}
+	return str
+}
+
+func printBlock(block Block) string {
+	transactions := make([]string, 0)
+	for _, transaction := range block.Transactions {
+		transactions = append(transactions, transaction.File.Name)
+	}
+	hashHex := hex.EncodeToString(block.Hash()[:])
+	prevHashHex := hex.EncodeToString(block.PrevHash[:])
+	return "[" + hashHex + ":" + prevHashHex + ":" + strings.Join(transactions, ",")
 }

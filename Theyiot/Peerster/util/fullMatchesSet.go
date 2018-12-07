@@ -15,11 +15,11 @@ type FullMatchesSet struct {
 }
 
 /*
-	contains checks whether our set contains the given list of keywords or not
+	contains checks whether our set contains the given blocks of keywords or not
  */
 func (set *FullMatchesSet) contains(str []string) bool {
-	set.lock.Lock()
-	defer set.lock.Unlock()
+	set.lock.RLock()
+	defer set.lock.RUnlock()
 	for _, list := range set.keywords {
 		if equals(list, str) {
 			return true
@@ -109,7 +109,7 @@ func CreateFullMatchesSet() *FullMatchesSet {
 }
 
 /*
-	Checks whether two lists are equal. The two list that are passed to the method should be sorted
+	Checks whether two lists are equal. The two blocks that are passed to the method should be sorted
  */
 func equals(l1, l2 []string) bool {
 	if len(l1) != len(l2) {
